@@ -12,6 +12,16 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- 
+      EXTERNAL CONFIGURATION:
+      To hide your keys from GitHub:
+      1. Create a file named 'config.js' in the same folder as this HTML file.
+      2. Paste your config there: window.FIREBASE_CONFIG = { apiKey: "...", ... };
+      3. Create a '.gitignore' file and add 'config.js' to it.
+    -->
+    <script src="config.js"></script>
+
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
         body { font-family: 'Inter', sans-serif; }
@@ -29,14 +39,18 @@
     <script type="text/babel" data-type="module">
         const { useState, useEffect, useMemo, useRef } = React;
 
-        // Firebase Setup - Using 11.6.1 ESM for broad compatibility
+        // Firebase Setup
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, query, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- FIREBASE CONFIGURATION ---
+        // --- CONFIGURATION LOGIC ---
         
-        const manualConfig = {
+        /**
+         * The app first looks for window.FIREBASE_CONFIG (from config.js).
+         * If not found, it falls back to the hardcoded config or environment variables.
+         */
+        const firebaseConfig = window.FIREBASE_CONFIG || {
             apiKey: "AIzaSyDAUR74Lfb2RYae0qDj9FLK4YdX4Cf-qic",
             authDomain: "localevents-2f7e4.firebaseapp.com",
             projectId: "localevents-2f7e4",
@@ -44,22 +58,11 @@
             messagingSenderId: "364858297232",
             appId: "1:364858297232:web:f442ed40221fd0f6e8c115",
             measurementId: "G-JHRW8HD7K1"
-        }; 
-
-        let firebaseConfig = null;
-        try {
-            if (manualConfig && manualConfig.apiKey !== "YOUR_API_KEY") {
-                firebaseConfig = manualConfig;
-            } else if (typeof __firebase_config !== 'undefined') {
-                firebaseConfig = JSON.parse(__firebase_config);
-            }
-        } catch (e) {
-            console.error("Failed to parse firebase config", e);
-        }
+        };
 
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'community-calendar-app';
         
-        // --- ADMIN CONFIGURATION ---
+        // ADMIN CONFIGURATION
         const ADMIN_UID = "YOUR_ADMIN_UID_HERE"; 
 
         const Icon = ({ name, size = 18, className = "" }) => {
@@ -93,19 +96,6 @@
             const [activeTag, setActiveTag] = useState(null);
             const [copyFeedback, setCopyFeedback] = useState(false);
             
-            // Initialization Check
-            if (!firebaseConfig) {
-                return (
-                    <div className="min-h-screen flex items-center justify-center p-6 bg-slate-100 text-center text-slate-800">
-                        <div className="bg-white p-8 rounded-3xl shadow-xl max-w-md w-full">
-                            <Icon name="alert-circle" size={48} className="text-red-500 mx-auto mb-4" />
-                            <h2 className="text-xl font-bold mb-2">Configuration Missing</h2>
-                            <p className="text-slate-500 text-sm">Please check your manualConfig object in the code.</p>
-                        </div>
-                    </div>
-                );
-            }
-
             // Initialize Services
             const appInstance = useMemo(() => initializeApp(firebaseConfig), []);
             const authInstance = useMemo(() => getAuth(appInstance), [appInstance]);
@@ -126,19 +116,13 @@
             useEffect(() => {
                 const initAuth = async () => {
                     try {
-                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                            await signInWithCustomToken(authInstance, __initial_auth_token);
-                        } else {
-                            await signInAnonymously(authInstance);
-                        }
+                        await signInAnonymously(authInstance);
                     } catch (error) {
                         console.error("Auth error:", error);
                         setErrorCode(error.code);
-                        if (error.code === 'auth/network-request-failed') {
-                            setErrorMsg("Network request failed. This is usually caused by an Ad-Blocker or Firewall blocking Firebase.");
-                        } else {
-                            setErrorMsg("Authentication failed. Ensure 'Anonymous Auth' is enabled in your Firebase Console.");
-                        }
+                        setErrorMsg(error.code === 'auth/network-request-failed' 
+                            ? "Network request failed. Check your internet or disable ad-blockers." 
+                            : "Authentication failed. Check Firebase Console settings.");
                         setIsLoading(false);
                     }
                 };
@@ -153,13 +137,13 @@
                 return () => unsubscribe();
             }, [authInstance]);
 
-            // Data Stream with Timeout
+            // Data Stream
             useEffect(() => {
                 if (!user) return;
                 
                 const timeout = setTimeout(() => {
                     if (isLoading) {
-                        setErrorMsg("Connection timed out. Check your Firestore rules and internet connection.");
+                        setErrorMsg("Connection timed out. Check your Firestore rules.");
                         setIsLoading(false);
                     }
                 }, 10000);
@@ -238,11 +222,7 @@
                 const daysInMonth = new Date(year, month + 1, 0).getDate();
                 const firstDay = new Date(year, month, 1).getDay();
                 const days = [];
-                
-                for (let i = 0; i < firstDay; i++) {
-                    days.push(<div key={`empty-${i}`} className="h-24 border border-slate-100 bg-slate-50/50"></div>);
-                }
-                
+                for (let i = 0; i < firstDay; i++) days.push(<div key={`empty-${i}`} className="h-24 border border-slate-100 bg-slate-50/50"></div>);
                 for (let d = 1; d <= daysInMonth; d++) {
                     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
                     const dayEvents = displayEvents.filter(e => e.date === dateStr);
@@ -281,30 +261,7 @@
                         </div>
                         <h2 className="text-2xl font-black text-slate-800 mb-2 tracking-tight">Connection Issue</h2>
                         <p className="text-slate-500 text-sm mb-8 leading-relaxed px-4">{errorMsg}</p>
-                        
-                        {errorCode === 'auth/network-request-failed' && (
-                            <div className="text-left bg-slate-50 rounded-2xl p-5 mb-8 border border-slate-200">
-                                <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                    <Icon name="help-circle" size={14}/> Troubleshooting Steps:
-                                </p>
-                                <ul className="text-sm text-slate-600 space-y-3">
-                                    <li className="flex gap-2">
-                                        <span className="font-bold text-indigo-600">1.</span>
-                                        <span>Disable <strong>Ad-Blockers</strong> (uBlock, AdBlock, etc.) for this page.</span>
-                                    </li>
-                                    <li className="flex gap-2">
-                                        <span className="font-bold text-indigo-600">2.</span>
-                                        <span>Ensure <strong>Anonymous Authentication</strong> is enabled in Firebase Console.</span>
-                                    </li>
-                                    <li className="flex gap-2">
-                                        <span className="font-bold text-indigo-600">3.</span>
-                                        <span>Try opening the file in an <strong>Incognito Window</strong>.</span>
-                                    </li>
-                                </ul>
-                            </div>
-                        )}
-                        
-                        <button onClick={() => window.location.reload()} className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black text-lg hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 active:scale-95">
+                        <button onClick={() => window.location.reload()} className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black text-lg hover:bg-indigo-700 transition-all shadow-lg active:scale-95">
                             Retry Connection
                         </button>
                     </div>
@@ -414,7 +371,7 @@
 
                     {isModalOpen && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-200">
-                            <div className="bg-white w-full max-w-lg rounded-[40px] shadow-2xl overflow-hidden">
+                            <div className="bg-white w-full max-w-lg rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in slide-in-from-bottom-8 duration-300">
                                 <div className="p-8 border-b border-slate-50 flex justify-between items-center bg-indigo-50/50">
                                     <h3 className="text-2xl font-black text-indigo-950 tracking-tight">{isAdmin ? "Publish Event" : "Submit Event"}</h3>
                                     <button onClick={() => setIsModalOpen(false)} className="bg-white p-2 rounded-full shadow-md text-slate-400 hover:text-indigo-600 transition-all"><Icon name="plus" className="rotate-45" size={24} /></button>
