@@ -142,7 +142,9 @@
                 contact: '', 
                 isMultiDay: false,
                 entryType: 'Free', // Default
-                entryFee: ''
+                entryFee: '',
+                isOtherTagSelected: false,
+                otherTag: ''
             });
 
             useEffect(() => {
@@ -194,16 +196,22 @@
                 if (newEvent.entryType === 'Paid' && !newEvent.entryFee) return;
 
                 try {
+                    const finalTags = [...newEvent.tags];
+                    if (newEvent.isOtherTagSelected && newEvent.otherTag.trim()) {
+                        finalTags.push(newEvent.otherTag.trim());
+                    }
+
                     const eventsCollection = collection(dbInstance, 'artifacts', appId, 'public', 'data', 'events');
                     await addDoc(eventsCollection, {
                         ...newEvent,
+                        tags: finalTags,
                         endDate: newEvent.isMultiDay ? newEvent.endDate : '',
                         status: isAdmin ? 'approved' : 'pending',
                         createdBy: user.uid,
                         createdAt: new Date().toISOString()
                     });
                     setNewEvent({ 
-                        title: '', date: '', endDate: '', time: '', location: '', description: '', tags: [], contact: '', isMultiDay: false, entryType: 'Free', entryFee: '' 
+                        title: '', date: '', endDate: '', time: '', location: '', description: '', tags: [], contact: '', isMultiDay: false, entryType: 'Free', entryFee: '', isOtherTagSelected: false, otherTag: '' 
                     });
                     setIsModalOpen(false);
                 } catch (error) { console.error(error); }
@@ -470,6 +478,7 @@
                         )}
                     </main>
 
+                    {/* Submission Modal */}
                     {isModalOpen && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-900/70 backdrop-blur-xl animate-in fade-in duration-300">
                             <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in slide-in-from-bottom-8 duration-500 max-h-[90vh] overflow-y-auto">
@@ -585,7 +594,29 @@
                                                         <span className="text-xs font-bold">{tag}</span>
                                                     </label>
                                                 ))}
+                                                <label className={`flex items-center gap-3 p-3 rounded-2xl border transition-all cursor-pointer ${newEvent.isOtherTagSelected ? 'bg-sky-50 border-sky-400 text-sky-700' : 'bg-slate-50 border-slate-100 text-slate-500 hover:border-sky-200'}`}>
+                                                    <input 
+                                                        type="checkbox" 
+                                                        className="hidden" 
+                                                        checked={newEvent.isOtherTagSelected} 
+                                                        onChange={() => setNewEvent(p => ({...p, isOtherTagSelected: !p.isOtherTagSelected}))} 
+                                                    />
+                                                    <Icon name={newEvent.isOtherTagSelected ? "check-circle" : "circle"} size={16} className={newEvent.isOtherTagSelected ? "text-sky-600" : "text-slate-300"} />
+                                                    <span className="text-xs font-bold">Other...</span>
+                                                </label>
                                             </div>
+
+                                            {newEvent.isOtherTagSelected && (
+                                                <div className="mt-2 animate-in slide-in-from-top-1 duration-200">
+                                                    <input 
+                                                        type="text" 
+                                                        placeholder="Type your custom tag..."
+                                                        className="w-full bg-white px-6 py-4 rounded-2xl border border-slate-200 focus:ring-4 focus:ring-indigo-100 outline-none transition-all font-bold text-sm" 
+                                                        value={newEvent.otherTag} 
+                                                        onChange={e => setNewEvent(p => ({...p, otherTag: e.target.value}))} 
+                                                    />
+                                                </div>
+                                            )}
                                         </div>
 
                                         <div className="space-y-3">
