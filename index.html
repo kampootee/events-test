@@ -36,37 +36,34 @@
         import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, query, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Global environment variables provided by the environment
-        const firebaseConfig = JSON.parse(__firebase_config);
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'community-calendar-app';
+        // Safely check for variables to prevent "White Page" crash when running locally
+        let firebaseConfig = null;
+        try {
+            firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        } catch (e) {
+            console.error("Failed to parse firebase config", e);
+        }
 
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'community-calendar-app';
+        
         // --- CONFIGURATION ---
         // Copy your UID from the bottom of the "Add Event" modal and paste it here
         const ADMIN_UID = "YOUR_ADMIN_UID_HERE"; 
 
         /**
          * Stable Icon Component
-         * Fixed the Node.removeChild error by using a stable container
-         * and manual DOM injection for Lucide.
          */
         const Icon = ({ name, size = 18, className = "" }) => {
             const containerRef = useRef(null);
 
             useEffect(() => {
                 if (window.lucide && containerRef.current) {
-                    // Create a fresh placeholder element
                     const i = document.createElement('i');
                     i.setAttribute('data-lucide', name);
                     i.style.width = `${size}px`;
                     i.style.height = `${size}px`;
-                    
-                    // Clear container and append placeholder
                     containerRef.current.innerHTML = '';
                     containerRef.current.appendChild(i);
-                    
-                    // Tell lucide to process only this specific container
                     window.lucide.createIcons({
                         root: containerRef.current,
                         attrs: { class: className }
@@ -74,7 +71,6 @@
                 }
             }, [name, size, className]);
 
-            // React manages the span, while the internal SVG is managed manually
             return <span ref={containerRef} className="inline-flex items-center justify-center pointer-events-none"></span>;
         };
 
@@ -87,6 +83,36 @@
             const [currentDate, setCurrentDate] = useState(new Date());
             const [activeTag, setActiveTag] = useState(null);
             const [copyFeedback, setCopyFeedback] = useState(false);
+            
+            // Initialization Check
+            if (!firebaseConfig) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center p-6 bg-slate-100">
+                        <div className="bg-white p-8 rounded-3xl shadow-xl max-w-md w-full border border-slate-200">
+                            <div className="bg-amber-100 w-16 h-16 rounded-full flex items-center justify-center mb-6">
+                                <Icon name="alert-triangle" className="text-amber-600" size={32} />
+                            </div>
+                            <h2 className="text-2xl font-black text-slate-800 mb-4 tracking-tight">Setup Required</h2>
+                            <p className="text-slate-600 leading-relaxed mb-6">
+                                To run this application locally, you need to provide a Firebase configuration object. 
+                                <br/><br/>
+                                1. Create a Firebase project at <span className="font-mono text-xs bg-slate-100 px-1">console.firebase.google.com</span>.
+                                <br/>
+                                2. Copy the config object and replace <span className="font-mono text-xs bg-slate-100 px-1">__firebase_config</span> in the code.
+                            </p>
+                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Running in Sandbox?</p>
+                                <p className="text-xs text-slate-500 mt-1">If you are seeing this inside the interactive preview, please refresh the page.</p>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            // Initialize Services
+            const app = useMemo(() => initializeApp(firebaseConfig), []);
+            const auth = useMemo(() => getAuth(app), [app]);
+            const db = useMemo(() => getFirestore(app), [app]);
 
             const isAdmin = user?.uid === ADMIN_UID;
 
@@ -115,7 +141,7 @@
                 initAuth();
                 const unsubscribe = onAuthStateChanged(auth, (u) => setUser(u));
                 return () => unsubscribe();
-            }, []);
+            }, [auth]);
 
             // Data Stream
             useEffect(() => {
@@ -129,7 +155,7 @@
                     setIsLoading(false);
                 });
                 return () => unsubscribe();
-            }, [user]);
+            }, [user, db]);
 
             // Filter & Sort
             const displayEvents = useMemo(() => {
@@ -217,7 +243,7 @@
             if (isLoading) return (
                 <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 space-y-4">
                     <Icon name="loader-2" className="animate-spin text-indigo-600" size={40} />
-                    <p className="text-slate-500 font-medium">Connecting to Community Hub...</p>
+                    <p className="text-slate-500 font-medium tracking-tight">Syncing with Community Hub...</p>
                 </div>
             );
 
@@ -233,10 +259,10 @@
                             </div>
                             <div className="flex items-center gap-4">
                                 <div className="flex bg-slate-100 p-1 rounded-xl">
-                                    <button onClick={() => setViewMode('list')} className={`p-1.5 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}>
+                                    <button onClick={() => setViewMode('list')} className={`p-1.5 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}>
                                         <Icon name="list" />
                                     </button>
-                                    <button onClick={() => setViewMode('calendar')} className={`p-1.5 rounded-lg transition-all ${viewMode === 'calendar' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}>
+                                    <button onClick={() => setViewMode('calendar')} className={`p-1.5 rounded-lg transition-all ${viewMode === 'calendar' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}>
                                         <Icon name="layout-grid" />
                                     </button>
                                 </div>
@@ -252,14 +278,14 @@
                             <div className="space-y-6">
                                 <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                                     <div>
-                                        <h2 className="text-3xl font-black text-slate-900">Upcoming Events</h2>
+                                        <h2 className="text-3xl font-black text-slate-900 tracking-tight">Upcoming Events</h2>
                                         <div className="flex items-center gap-2 mt-2">
                                             {isAdmin && <span className="flex items-center gap-1 text-indigo-600 font-bold bg-indigo-50 px-3 py-1 rounded-full text-xs border border-indigo-100 shadow-sm"><Icon name="shield-check" size={14}/> Admin Mode Active</span>}
                                             <p className="text-slate-500 text-sm">Discover and share local gatherings</p>
                                         </div>
                                     </div>
                                     {activeTag && (
-                                        <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 px-4 py-2 rounded-full text-amber-700 text-sm font-bold shadow-sm">
+                                        <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 px-4 py-2 rounded-full text-amber-700 text-sm font-bold shadow-sm animate-in fade-in slide-in-from-right-4">
                                             <Icon name="tag" size={14} className="text-amber-500" /> 
                                             <span>Events in: <strong>{activeTag}</strong></span>
                                             <button onClick={() => setActiveTag(null)} className="ml-1 p-1 hover:bg-amber-200 rounded-full transition-colors"><Icon name="x" size={14}/></button>
@@ -269,7 +295,7 @@
 
                                 <div className="grid gap-5">
                                     {displayEvents.length > 0 ? displayEvents.map(event => (
-                                        <div key={event.id} className={`bg-white p-6 rounded-3xl border transition-all relative ${event.status === 'pending' ? 'border-amber-200 bg-amber-50/20' : 'border-slate-200 shadow-sm hover:shadow-xl'}`}>
+                                        <div key={event.id} className={`bg-white p-6 rounded-3xl border transition-all relative ${event.status === 'pending' ? 'border-amber-200 bg-amber-50/20' : 'border-slate-200 shadow-sm hover:shadow-xl hover:border-indigo-100'}`}>
                                             <div className="flex flex-col md:flex-row md:items-center gap-6">
                                                 <div className={`flex-shrink-0 w-16 h-16 rounded-2xl flex flex-col items-center justify-center border shadow-sm ${event.status === 'pending' ? 'bg-amber-100 text-amber-600 border-amber-200' : 'bg-indigo-50 text-indigo-600 border-indigo-100'}`}>
                                                     <span className="text-[10px] font-black uppercase tracking-wider">{new Date(event.date).toLocaleDateString('en-US', { month: 'short' })}</span>
@@ -280,7 +306,7 @@
                                                         <span className="text-[10px] font-black tracking-widest uppercase bg-slate-100 px-2.5 py-1 rounded-full text-slate-500 border border-slate-200">{event.category}</span>
                                                         {event.status === 'pending' && <span className="text-[10px] font-black bg-amber-500 text-white px-2.5 py-1 rounded-full flex items-center gap-1 shadow-sm"><Icon name="clock" size={10}/> PENDING APPROVAL</span>}
                                                     </div>
-                                                    <h3 className="text-xl font-bold text-slate-900">{event.title}</h3>
+                                                    <h3 className="text-xl font-bold text-slate-900 group-hover:text-indigo-600">{event.title}</h3>
                                                     <p className="text-slate-600 text-sm mt-1 leading-relaxed">{event.description}</p>
                                                     <div className="flex flex-wrap gap-5 mt-5 text-sm font-semibold text-slate-500">
                                                         <div className="flex items-center gap-2 bg-slate-50 px-3 py-1 rounded-lg border border-slate-100"><Icon name="clock" size={14} className="text-indigo-500" />{event.time}</div>
@@ -299,15 +325,16 @@
                                         <div className="text-center py-24 bg-white rounded-[40px] border-4 border-dashed border-slate-100">
                                             <Icon name="calendar" size={48} className="text-slate-200 mx-auto mb-4" />
                                             <h3 className="text-2xl font-bold text-slate-800">{activeTag ? `No events in ${activeTag}` : 'The calendar is quiet...'}</h3>
+                                            <p className="text-slate-400 mt-2">Check back soon or share your own event!</p>
                                             {activeTag && <button onClick={() => setActiveTag(null)} className="mt-6 text-indigo-600 font-bold hover:underline bg-indigo-50 px-6 py-2 rounded-full">Show all events</button>}
                                         </div>
                                     )}
                                 </div>
                             </div>
                         ) : (
-                            <div className="bg-white rounded-[40px] border border-slate-200 shadow-xl overflow-hidden">
+                            <div className="bg-white rounded-[40px] border border-slate-200 shadow-xl overflow-hidden animate-in zoom-in duration-300">
                                 <div className="p-8 flex items-center justify-between border-b border-slate-100 bg-slate-50/30">
-                                    <h2 className="text-2xl font-black text-slate-900">{currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</h2>
+                                    <h2 className="text-2xl font-black text-slate-900 tracking-tight">{currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</h2>
                                     <div className="flex gap-3">
                                         <button onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() - 1)))} className="p-2.5 hover:bg-white border border-transparent hover:border-slate-200 rounded-2xl transition-all"><Icon name="chevron-left" /></button>
                                         <button onClick={() => setCurrentDate(new Date())} className="px-6 py-2.5 text-sm font-bold bg-white border border-slate-200 rounded-2xl shadow-sm hover:shadow-md transition-all">Today</button>
@@ -323,11 +350,11 @@
                     </main>
 
                     {isModalOpen && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm">
-                            <div className="bg-white w-full max-w-lg rounded-[40px] shadow-2xl overflow-hidden">
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-200">
+                            <div className="bg-white w-full max-w-lg rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in slide-in-from-bottom-8 duration-300">
                                 <div className="p-8 border-b border-slate-50 flex justify-between items-center bg-indigo-50/50">
-                                    <h3 className="text-2xl font-black text-indigo-950 tracking-tight">{isAdmin ? "Publish Event" : "Submit Event"}</h3>
-                                    <button onClick={() => setIsModalOpen(false)} className="bg-white p-2 rounded-full shadow-md text-slate-400"><Icon name="plus" className="rotate-45" size={24} /></button>
+                                    <h3 className="text-2xl font-black text-indigo-950 tracking-tight">{isAdmin ? "Publish Event" : "Submit Community Event"}</h3>
+                                    <button onClick={() => setIsModalOpen(false)} className="bg-white p-2 rounded-full shadow-md text-slate-400 hover:text-indigo-600 transition-all"><Icon name="plus" className="rotate-45" size={24} /></button>
                                 </div>
                                 <form onSubmit={handleAddEvent} className="p-8 space-y-5">
                                     {!isAdmin && (
