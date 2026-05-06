@@ -15,12 +15,9 @@
     
     <!-- 
       EXTERNAL CONFIGURATION:
-      To hide your keys from GitHub:
-      1. Create a file named 'config.js' in the same folder as this HTML file.
-      2. Paste your config there: 
-         window.FIREBASE_CONFIG = { apiKey: "...", ... };
-         window.ADMIN_UID = "FMv14irUYzes4glPHCNV8BexIqK2";
-      3. Create a '.gitignore' file and add 'config.js' to it.
+      This file must define:
+      window.FIREBASE_CONFIG = { ... };
+      window.ADMIN_UID = "FMv14irUYzes4glPHCNV8BexIqK2";
     -->
     <script src="config.js"></script>
 
@@ -47,22 +44,10 @@
         import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, query, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- CONFIGURATION LOGIC ---
-        
-        const firebaseConfig = window.FIREBASE_CONFIG || {
-            apiKey: "AIzaSyDAUR74Lfb2RYae0qDj9FLK4YdX4Cf-qic",
-            authDomain: "localevents-2f7e4.firebaseapp.com",
-            projectId: "localevents-2f7e4",
-            storageBucket: "localevents-2f7e4.firebasestorage.app",
-            messagingSenderId: "364858297232",
-            appId: "1:364858297232:web:f442ed40221fd0f6e8c115",
-            measurementId: "G-JHRW8HD7K1"
-        };
-
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'community-calendar-app';
-        
-        // --- ADMIN CONFIGURATION ---
-        // Pulling from config.js for security.
-        const ADMIN_UID = window.ADMIN_UID || "DEVELOPMENT_MODE"; 
+        // These are now pulled exclusively from your local config.js file
+        const firebaseConfig = window.FIREBASE_CONFIG;
+        const ADMIN_UID = window.ADMIN_UID;
+        const appId = window.FIREBASE_APP_ID || 'community-calendar-app';
 
         const Icon = ({ name, size = 18, className = "" }) => {
             const containerRef = useRef(null);
@@ -95,6 +80,19 @@
             const [activeTag, setActiveTag] = useState(null);
             const [copyFeedback, setCopyFeedback] = useState(false);
             
+            // Configuration Guard
+            if (!firebaseConfig) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center p-6 bg-slate-100 text-center">
+                        <div className="bg-white p-8 rounded-3xl shadow-xl max-w-md w-full">
+                            <Icon name="alert-circle" size={48} className="text-red-500 mx-auto mb-4" />
+                            <h2 className="text-xl font-bold mb-2">Configuration Missing</h2>
+                            <p className="text-slate-500 text-sm">Please ensure your <code className="bg-slate-50 px-1">config.js</code> file is in the same folder and defines <code className="bg-slate-50 px-1">window.FIREBASE_CONFIG</code>.</p>
+                        </div>
+                    </div>
+                );
+            }
+
             // Initialize Services
             const appInstance = useMemo(() => initializeApp(firebaseConfig), []);
             const authInstance = useMemo(() => getAuth(appInstance), [appInstance]);
@@ -170,12 +168,19 @@
             // Filter & Sort
             const displayEvents = useMemo(() => {
                 let filtered = [...events];
-                if (!isAdmin) filtered = filtered.filter(e => e.status === 'approved');
+                
+                if (!isAdmin) {
+                    filtered = filtered.filter(e => 
+                        e.status === 'approved' || (user && e.createdBy === user.uid)
+                    );
+                }
+
                 if (activeTag) {
                     filtered = filtered.filter(e => e.location?.toLowerCase() === activeTag.toLowerCase());
                 }
+                
                 return filtered.sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
-            }, [events, activeTag, isAdmin]);
+            }, [events, activeTag, isAdmin, user]);
 
             const handleAddEvent = async (e) => {
                 e.preventDefault();
@@ -311,41 +316,46 @@
                                 </header>
 
                                 <div className="grid gap-5">
-                                    {displayEvents.length > 0 ? displayEvents.map(event => (
-                                        <div key={event.id} className={`bg-white p-6 rounded-3xl border transition-all relative ${event.status === 'pending' ? 'border-amber-200 bg-amber-50/20' : 'border-slate-200 shadow-sm hover:shadow-xl'}`}>
-                                            <div className="flex flex-col md:flex-row md:items-center gap-6">
-                                                <div className={`flex-shrink-0 w-16 h-16 rounded-2xl flex flex-col items-center justify-center border shadow-sm ${event.status === 'pending' ? 'bg-amber-100 text-amber-600 border-amber-200' : 'bg-indigo-50 text-indigo-600 border-indigo-100'}`}>
-                                                    <span className="text-[10px] font-black uppercase tracking-wider">{new Date(event.date).toLocaleDateString('en-US', { month: 'short' })}</span>
-                                                    <span className="text-3xl font-black leading-none">{new Date(event.date).getDate()}</span>
-                                                </div>
-                                                <div className="flex-grow">
-                                                    <div className="flex items-center gap-2 mb-2">
-                                                        <span className="text-[10px] font-black tracking-widest uppercase bg-slate-100 px-2.5 py-1 rounded-full text-slate-500 border border-slate-200">{event.category}</span>
-                                                        {event.status === 'pending' && <span className="text-[10px] font-black bg-amber-500 text-white px-2.5 py-1 rounded-full flex items-center gap-1 shadow-sm"><Icon name="clock" size={10}/> PENDING APPROVAL</span>}
+                                    {displayEvents.length > 0 ? displayEvents.map(event => {
+                                        const isMyOwn = user && event.createdBy === user.uid;
+                                        
+                                        return (
+                                            <div key={event.id} className={`bg-white p-6 rounded-3xl border transition-all relative ${event.status === 'pending' ? 'border-amber-200 bg-amber-50/20' : 'border-slate-200 shadow-sm hover:shadow-xl'}`}>
+                                                <div className="flex flex-col md:flex-row md:items-center gap-6">
+                                                    <div className={`flex-shrink-0 w-16 h-16 rounded-2xl flex flex-col items-center justify-center border shadow-sm ${event.status === 'pending' ? 'bg-amber-100 text-amber-600 border-amber-200' : 'bg-indigo-50 text-indigo-600 border-indigo-100'}`}>
+                                                        <span className="text-[10px] font-black uppercase tracking-wider">{new Date(event.date).toLocaleDateString('en-US', { month: 'short' })}</span>
+                                                        <span className="text-3xl font-black leading-none">{new Date(event.date).getDate()}</span>
                                                     </div>
-                                                    <h3 className="text-xl font-bold text-slate-900">{event.title}</h3>
-                                                    <p className="text-slate-600 text-sm mt-1 leading-relaxed">{event.description}</p>
-                                                    
-                                                    <div className="flex flex-wrap gap-5 mt-5 text-sm font-semibold text-slate-500">
-                                                        <div className="flex items-center gap-2 bg-slate-50 px-3 py-1 rounded-lg border border-slate-100"><Icon name="clock" size={14} className="text-indigo-500" />{event.time}</div>
-                                                        <button onClick={() => setActiveTag(event.location)} className={`flex items-center gap-2 px-3 py-1 rounded-lg border transition-all ${activeTag === event.location ? 'bg-amber-100 border-amber-200 text-amber-700' : 'bg-slate-50 border-slate-100 hover:border-indigo-200 hover:text-indigo-600'}`}>
-                                                            <Icon name="map-pin" size={14} className={activeTag === event.location ? 'text-amber-500' : 'text-indigo-500'} /> {event.location}
-                                                        </button>
-                                                        {event.contact && (
-                                                            <div className="flex items-center gap-2 bg-slate-50 px-3 py-1 rounded-lg border border-slate-100">
-                                                                <Icon name="mail" size={14} className="text-indigo-500" />
-                                                                {event.contact}
-                                                            </div>
-                                                        )}
+                                                    <div className="flex-grow">
+                                                        <div className="flex items-center gap-2 mb-2">
+                                                            <span className="text-[10px] font-black tracking-widest uppercase bg-slate-100 px-2.5 py-1 rounded-full text-slate-500 border border-slate-200">{event.category}</span>
+                                                            {event.status === 'pending' && <span className="text-[10px] font-black bg-amber-500 text-white px-2.5 py-1 rounded-full flex items-center gap-1 shadow-sm"><Icon name="clock" size={10}/> PENDING APPROVAL</span>}
+                                                            {isMyOwn && !isAdmin && <span className="text-[10px] font-black bg-indigo-100 text-indigo-600 px-2.5 py-1 rounded-full border border-indigo-200">YOUR SUBMISSION</span>}
+                                                        </div>
+                                                        <h3 className="text-xl font-bold text-slate-900">{event.title}</h3>
+                                                        <p className="text-slate-600 text-sm mt-1 leading-relaxed">{event.description}</p>
+                                                        
+                                                        <div className="flex flex-wrap gap-5 mt-5 text-sm font-semibold text-slate-500">
+                                                            <div className="flex items-center gap-2 bg-slate-50 px-3 py-1 rounded-lg border border-slate-100"><Icon name="clock" size={14} className="text-indigo-500" />{event.time}</div>
+                                                            <button onClick={() => setActiveTag(event.location)} className={`flex items-center gap-2 px-3 py-1 rounded-lg border transition-all ${activeTag === event.location ? 'bg-amber-100 border-amber-200 text-amber-700' : 'bg-slate-50 border-slate-100 hover:border-indigo-200 hover:text-indigo-600'}`}>
+                                                                <Icon name="map-pin" size={14} className={activeTag === event.location ? 'text-amber-500' : 'text-indigo-500'} /> {event.location}
+                                                            </button>
+                                                            {event.contact && (
+                                                                <div className="flex items-center gap-2 bg-slate-50 px-3 py-1 rounded-lg border border-slate-100">
+                                                                    <Icon name="mail" size={14} className="text-indigo-500" />
+                                                                    {event.contact}
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </div>
-                                                </div>
-                                                <div className="flex md:flex-col gap-3">
-                                                    {isAdmin && event.status === 'pending' && <button onClick={() => approveEvent(event.id)} className="bg-green-600 text-white p-3 rounded-2xl hover:bg-green-700 shadow-lg shadow-green-100 transition-all active:scale-90"><Icon name="check-circle" size={20}/></button>}
-                                                    {isAdmin && <button onClick={() => deleteEvent(event.id)} className="bg-white border border-red-100 text-red-500 p-3 rounded-2xl hover:bg-red-500 hover:text-white transition-all active:scale-90 shadow-sm"><Icon name="trash-2" size={20}/></button>}
+                                                    <div className="flex md:flex-col gap-3">
+                                                        {isAdmin && event.status === 'pending' && <button onClick={() => approveEvent(event.id)} title="Approve" className="bg-green-600 text-white p-3 rounded-2xl hover:bg-green-700 shadow-lg shadow-green-100 transition-all active:scale-90"><Icon name="check-circle" size={20}/></button>}
+                                                        {(isAdmin || (isMyOwn && event.status === 'pending')) && <button onClick={() => deleteEvent(event.id)} title="Delete" className="bg-white border border-red-100 text-red-500 p-3 rounded-2xl hover:bg-red-500 hover:text-white transition-all active:scale-90 shadow-sm"><Icon name="trash-2" size={20}/></button>}
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    )) : (
+                                        );
+                                    }) : (
                                         <div className="text-center py-24 bg-white rounded-[40px] border-4 border-dashed border-slate-100">
                                             <Icon name="calendar" size={48} className="text-slate-200 mx-auto mb-4" />
                                             <h3 className="text-2xl font-bold text-slate-800 tracking-tight">{activeTag ? `No events in ${activeTag}` : 'The calendar is quiet...'}</h3>
@@ -428,10 +438,10 @@
                                         {isAdmin ? "Publish Event Now" : "Submit for Approval"}
                                     </button>
 
-                                    <div className="mt-4 pt-6 border-t border-slate-100">
-                                        <div className="flex items-center justify-between bg-slate-50 border border-slate-200 p-3 rounded-2xl">
-                                            <div className="overflow-hidden">
-                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Your User Identifier (Admin Logged In)</p>
+                                    <div className="mt-4 pt-6 border-t border-slate-100 text-center">
+                                        <div className="inline-flex items-center justify-between bg-slate-50 border border-slate-200 p-3 rounded-2xl max-w-full">
+                                            <div className="overflow-hidden text-left px-2">
+                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Admin Account Identifier</p>
                                                 <code className="text-[10px] text-slate-600 truncate block">{user?.uid}</code>
                                             </div>
                                             <button type="button" onClick={copyUID} className={`p-3 rounded-xl transition-all shadow-sm ${copyFeedback ? 'bg-green-500 text-white' : 'bg-white text-slate-500 hover:text-indigo-600'}`}>
