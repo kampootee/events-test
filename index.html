@@ -28,9 +28,13 @@
         .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
         
         .glass-effect {
-            background: rgba(255, 255, 255, 0.8);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+        }
+
+        .hero-gradient {
+            background: linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(15, 23, 42, 0.9) 100%);
         }
 
         .event-card {
@@ -38,7 +42,7 @@
         }
 
         .event-card:hover {
-            transform: translateY(-4px);
+            transform: translateY(-6px);
         }
 
         .category-Social { background-color: #e0e7ff; color: #4338ca; }
@@ -48,7 +52,7 @@
         .category-General { background-color: #fae8ff; color: #a21caf; }
 
         /* Custom scrollbar */
-        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
         ::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
@@ -70,9 +74,9 @@
         const ADMIN_UID = window.ADMIN_UID;
         const appId = window.FIREBASE_APP_ID || 'localevents-app';
 
-        /**
-         * Stable Icon Component
-         */
+        // Placeholder Image URL - Change this to any image link you like
+        const HEADER_IMAGE_URL = "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?q=80&w=2069&auto=format&fit=crop";
+
         const Icon = ({ name, size = 18, className = "" }) => {
             const containerRef = useRef(null);
             useEffect(() => {
@@ -102,7 +106,6 @@
             const [currentDate, setCurrentDate] = useState(new Date());
             const [activeTag, setActiveTag] = useState(null);
             
-            // Initialize Services
             const appInstance = useMemo(() => firebaseConfig ? initializeApp(firebaseConfig) : null, []);
             const authInstance = useMemo(() => appInstance ? getAuth(appInstance) : null, [appInstance]);
             const dbInstance = useMemo(() => appInstance ? getFirestore(appInstance) : null, [appInstance]);
@@ -119,7 +122,7 @@
                     try {
                         await signInAnonymously(authInstance);
                     } catch (error) {
-                        setErrorMsg("Network issue. Please refresh.");
+                        setErrorMsg("Network issue.");
                         setIsLoading(false);
                     }
                 };
@@ -135,7 +138,6 @@
                     setEvents(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
                     setIsLoading(false);
                 }, (err) => {
-                    setErrorMsg("Connection to database restricted.");
                     setIsLoading(false);
                 });
                 return () => unsubscribe();
@@ -190,7 +192,7 @@
                     const dayEvents = displayEvents.filter(e => e.date === dateStr);
                     days.push(
                         <div key={d} className="h-32 border-b border-r border-slate-100 p-2 hover:bg-indigo-50/30 transition-colors">
-                            <span className={`text-xs font-bold ${dayEvents.length > 0 ? 'text-indigo-600' : 'text-slate-400'}`}>{d}</span>
+                            <span className={`text-xs font-bold ${dayEvents.length > 0 ? 'text-indigo-600 font-black' : 'text-slate-400'}`}>{d}</span>
                             <div className="mt-2 space-y-1 overflow-y-auto max-h-20">
                                 {dayEvents.map(event => (
                                     <div 
@@ -208,99 +210,104 @@
                 return days;
             };
 
-            if (!firebaseConfig) return <div className="min-h-screen flex items-center justify-center font-bold text-slate-400 text-center p-6">Configuration Missing.<br/>Please ensure config.js is in the same folder.</div>;
-
             if (isLoading) return (
                 <div className="min-h-screen flex flex-col items-center justify-center bg-white space-y-6">
                     <div className="relative">
                         <div className="w-16 h-16 border-4 border-indigo-50 rounded-full"></div>
                         <div className="w-16 h-16 border-4 border-t-indigo-600 rounded-full animate-spin absolute top-0 left-0"></div>
                     </div>
-                    <p className="text-slate-400 font-bold text-sm tracking-widest uppercase">Initializing Hub</p>
+                    <p className="text-slate-400 font-bold text-sm tracking-widest uppercase">Syncing Community Hub</p>
                 </div>
             );
 
             return (
                 <div className="min-h-screen pb-20">
-                    <nav className="glass-effect sticky top-0 z-40 border-b border-slate-200/60">
-                        <div className="max-w-6xl mx-auto px-6 h-20 flex items-center justify-between">
+                    {/* Sticky Navbar */}
+                    <nav className="glass-effect sticky top-0 z-40 border-b border-slate-200/60 shadow-sm">
+                        <div className="max-w-6xl mx-auto px-6 h-16 sm:h-20 flex items-center justify-between">
                             <div className="flex items-center gap-4 cursor-pointer group" onClick={() => setActiveTag(null)}>
-                                <div className="bg-gradient-to-tr from-indigo-600 to-violet-500 p-2.5 rounded-2xl shadow-xl shadow-indigo-200 group-active:scale-95 transition-all">
-                                    <Icon name="calendar-range" className="text-white" size={24} />
+                                <div className="bg-gradient-to-tr from-indigo-600 to-violet-500 p-2 rounded-xl shadow-lg shadow-indigo-200 transition-all">
+                                    <Icon name="calendar-range" className="text-white" size={20} />
                                 </div>
-                                <div>
-                                    <h1 className="text-xl font-extrabold text-slate-900 tracking-tight leading-none">Community Hub</h1>
-                                    <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest mt-1">Live Events Portal</p>
-                                </div>
+                                <h1 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight leading-none">Hub</h1>
                             </div>
                             
-                            <div className="flex items-center gap-6">
-                                <div className="hidden sm:flex bg-slate-100/80 p-1.5 rounded-2xl border border-slate-200/50">
-                                    <button onClick={() => setViewMode('list')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${viewMode === 'list' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-800'}`}>
+                            <div className="flex items-center gap-4 sm:gap-6">
+                                <div className="hidden sm:flex bg-slate-100/80 p-1 rounded-xl border border-slate-200/50">
+                                    <button onClick={() => setViewMode('list')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${viewMode === 'list' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-800'}`}>
                                         <Icon name="layout-list" size={14} /> List
                                     </button>
-                                    <button onClick={() => setViewMode('calendar')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${viewMode === 'calendar' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-800'}`}>
+                                    <button onClick={() => setViewMode('calendar')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${viewMode === 'calendar' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-800'}`}>
                                         <Icon name="calendar" size={14} /> Calendar
                                     </button>
                                 </div>
-                                <button onClick={() => setIsModalOpen(true)} className="bg-slate-900 hover:bg-slate-800 text-white px-6 py-3 rounded-2xl flex items-center gap-2 text-sm font-bold shadow-xl shadow-slate-200 active:scale-95 transition-all">
-                                    <Icon name="sparkles" size={16} className="text-indigo-400" />
-                                    {isAdmin ? "New Event" : "Submit Event"}
+                                <button onClick={() => setIsModalOpen(true)} className="bg-slate-900 hover:bg-slate-800 text-white px-5 sm:px-6 py-2.5 sm:py-3 rounded-xl flex items-center gap-2 text-xs sm:text-sm font-bold shadow-xl active:scale-95 transition-all">
+                                    <Icon name="plus" size={16} className="text-indigo-400" />
+                                    {isAdmin ? "New Event" : "Submit"}
                                 </button>
                             </div>
                         </div>
                     </nav>
 
+                    {/* Hero Section with Image Option */}
+                    <div className="relative w-full h-[300px] sm:h-[400px] overflow-hidden">
+                        <img 
+                            src={HEADER_IMAGE_URL} 
+                            alt="Community Hero" 
+                            className="absolute inset-0 w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 hero-gradient flex items-end">
+                            <div className="max-w-6xl mx-auto px-6 w-full pb-10 sm:pb-16 text-white animate-in fade-in slide-in-from-bottom-6 duration-700">
+                                <div className="flex items-center gap-3 mb-4">
+                                    {isAdmin && <span className="bg-indigo-600/80 backdrop-blur-md text-white text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-tighter shadow-xl">Admin Mode</span>}
+                                    <span className="bg-white/10 backdrop-blur-md text-white/80 text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-widest border border-white/10">Live Updates</span>
+                                </div>
+                                <h2 className="text-4xl sm:text-6xl font-black tracking-tighter mb-4">What's On</h2>
+                                <p className="text-white/70 text-base sm:text-lg font-medium max-w-xl leading-relaxed">Your neighborhood connection for culture, community meetings, and local social gatherings.</p>
+                            </div>
+                        </div>
+                    </div>
+
                     <main className="max-w-6xl mx-auto px-6 py-12">
                         {viewMode === 'list' ? (
                             <div className="space-y-10">
-                                <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-slate-200 pb-10">
-                                    <div>
-                                        <div className="flex items-center gap-3 mb-2">
-                                            <h2 className="text-4xl font-[900] text-slate-900 tracking-tight">What's On</h2>
-                                            {isAdmin && <span className="bg-indigo-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter shadow-lg shadow-indigo-100">Admin</span>}
-                                        </div>
-                                        <p className="text-slate-500 font-medium">Discover local gatherings and events in your neighborhood.</p>
+                                {activeTag && (
+                                    <div className="flex items-center gap-3 bg-white border border-indigo-100 p-3 pl-5 rounded-3xl shadow-sm animate-in slide-in-from-right-4">
+                                        <Icon name="map-pin" size={18} className="text-indigo-500" /> 
+                                        <span className="text-sm sm:text-base font-bold text-slate-700">Showing events in <span className="text-indigo-600">{activeTag}</span></span>
+                                        <button onClick={() => setActiveTag(null)} className="ml-auto bg-slate-50 hover:bg-red-50 p-2 rounded-2xl text-slate-400 hover:text-red-500 transition-colors"><Icon name="x" size={16}/></button>
                                     </div>
-                                    
-                                    {activeTag && (
-                                        <div className="flex items-center gap-3 bg-white border border-indigo-100 p-2 pl-4 rounded-2xl shadow-sm animate-in slide-in-from-right-4">
-                                            <Icon name="map-pin" size={16} className="text-indigo-500" /> 
-                                            <span className="text-sm font-bold text-slate-700">Events in <span className="text-indigo-600">{activeTag}</span></span>
-                                            <button onClick={() => setActiveTag(null)} className="bg-slate-50 hover:bg-red-50 p-2 rounded-xl text-slate-400 hover:text-red-500 transition-colors"><Icon name="x" size={16}/></button>
-                                        </div>
-                                    )}
-                                </header>
+                                )}
 
-                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                                     {displayEvents.length > 0 ? displayEvents.map(event => {
                                         const isMyOwn = user && event.createdBy === user.uid;
                                         return (
-                                            <div key={event.id} className={`event-card bg-white p-6 rounded-[2.5rem] border border-slate-200/60 shadow-sm hover:shadow-2xl hover:border-indigo-100/50 relative overflow-hidden group ${event.status === 'pending' ? 'bg-indigo-50/20' : ''}`}>
-                                                <div className="flex gap-6">
-                                                    <div className="flex-shrink-0 flex flex-col items-center justify-center w-20 h-24 bg-slate-50 rounded-3xl border border-slate-100 group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-500">
+                                            <div key={event.id} className={`event-card bg-white p-6 sm:p-8 rounded-[3rem] border border-slate-200/60 shadow-sm hover:shadow-2xl hover:border-indigo-100/50 relative overflow-hidden group ${event.status === 'pending' ? 'bg-amber-50/5' : ''}`}>
+                                                <div className="flex flex-col sm:flex-row gap-6 sm:gap-8">
+                                                    <div className="flex-shrink-0 flex flex-col items-center justify-center w-20 h-24 bg-slate-50 rounded-3xl border border-slate-100 group-hover:bg-indigo-600 group-hover:text-white transition-all duration-500 shadow-sm">
                                                         <span className="text-[10px] font-black uppercase tracking-widest opacity-60">{new Date(event.date).toLocaleDateString('en-US', { month: 'short' })}</span>
                                                         <span className="text-3xl font-black">{new Date(event.date).getDate()}</span>
                                                     </div>
                                                     
                                                     <div className="flex-grow min-w-0">
-                                                        <div className="flex items-center gap-2 mb-2">
-                                                            <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border border-slate-100 shadow-sm category-${event.category}`}>{event.category}</span>
-                                                            {event.status === 'pending' && <span className="text-[10px] font-black bg-amber-500 text-white px-2 py-1 rounded-full shadow-lg shadow-amber-100">Reviewing</span>}
-                                                            {isMyOwn && !isAdmin && <span className="text-[10px] font-black bg-slate-900 text-white px-2 py-1 rounded-full shadow-lg shadow-slate-200">Personal</span>}
+                                                        <div className="flex items-center gap-2 mb-3">
+                                                            <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full border border-slate-100 shadow-sm category-${event.category}`}>{event.category}</span>
+                                                            {event.status === 'pending' && <span className="text-[9px] font-black bg-amber-500 text-white px-3 py-1 rounded-full shadow-lg shadow-amber-100">Reviewing</span>}
+                                                            {isMyOwn && !isAdmin && <span className="text-[9px] font-black bg-slate-900 text-white px-3 py-1 rounded-full shadow-lg shadow-slate-200 uppercase tracking-widest">Self</span>}
                                                         </div>
                                                         
-                                                        <h3 className="text-xl font-extrabold text-slate-900 group-hover:text-indigo-600 transition-colors truncate">{event.title}</h3>
-                                                        <p className="text-slate-500 text-sm mt-2 leading-relaxed line-clamp-2">{event.description || "No description provided."}</p>
+                                                        <h3 className="text-2xl font-extrabold text-slate-900 group-hover:text-indigo-600 transition-colors truncate">{event.title}</h3>
+                                                        <p className="text-slate-500 text-sm mt-3 leading-relaxed line-clamp-3 font-medium">{event.description || "No description provided."}</p>
                                                         
-                                                        <div className="flex flex-wrap gap-4 mt-6">
+                                                        <div className="flex flex-wrap gap-5 mt-8 border-t border-slate-50 pt-6">
                                                             <div className="flex items-center gap-2 text-xs font-bold text-slate-400"><Icon name="clock" size={14} className="text-indigo-500" /> {event.time}</div>
                                                             <button onClick={() => setActiveTag(event.location)} className="flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-indigo-600 transition-colors"><Icon name="map-pin" size={14} className="text-indigo-500" /> {event.location}</button>
-                                                            {event.contact && <div className="flex items-center gap-2 text-xs font-bold text-slate-400"><Icon name="user-plus" size={14} className="text-indigo-500" /> {event.contact}</div>}
+                                                            {event.contact && <div className="flex items-center gap-2 text-xs font-bold text-slate-400"><Icon name="mail" size={14} className="text-indigo-500" /> {event.contact}</div>}
                                                         </div>
                                                     </div>
 
-                                                    <div className="flex flex-col gap-2">
+                                                    <div className="flex sm:flex-col gap-2 justify-end sm:justify-start">
                                                         {isAdmin && event.status === 'pending' && (
                                                             <button onClick={() => approveEvent(event.id)} className="w-12 h-12 bg-green-500 text-white rounded-2xl flex items-center justify-center hover:bg-green-600 shadow-lg shadow-green-100 transition-all active:scale-90">
                                                                 <Icon name="check" size={24} />
@@ -316,89 +323,83 @@
                                             </div>
                                         );
                                     }) : (
-                                        <div className="lg:col-span-2 text-center py-32 bg-white rounded-[3rem] border border-dashed border-slate-200">
+                                        <div className="lg:col-span-2 text-center py-32 bg-white rounded-[4rem] border-4 border-dashed border-slate-100">
                                             <div className="bg-slate-50 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6">
-                                                <Icon name="calendar-x" size={40} className="text-slate-300" />
+                                                <Icon name="calendar-x" size={40} className="text-slate-200" />
                                             </div>
-                                            <h3 className="text-2xl font-black text-slate-800">The hub is quiet...</h3>
-                                            <p className="text-slate-400 mt-2 font-medium">Be the first to share a community gathering.</p>
+                                            <h3 className="text-2xl font-black text-slate-800">No events found</h3>
+                                            <p className="text-slate-400 mt-2 font-medium">Check back soon or share a new gathering.</p>
                                         </div>
                                     )}
                                 </div>
                             </div>
                         ) : (
-                            <div className="bg-white rounded-[3rem] border border-slate-200/60 shadow-2xl overflow-hidden animate-in zoom-in duration-500">
-                                <div className="p-10 flex items-center justify-between bg-slate-50/50 border-b border-slate-100">
-                                    <h2 className="text-3xl font-[900] text-slate-900 tracking-tight">{currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</h2>
+                            <div className="bg-white rounded-[3.5rem] border border-slate-200/60 shadow-2xl overflow-hidden animate-in zoom-in duration-500">
+                                <div className="p-10 flex flex-col sm:flex-row sm:items-center justify-between bg-slate-50/50 border-b border-slate-100 gap-6">
+                                    <h2 className="text-4xl font-black text-slate-900 tracking-tighter leading-none">{currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</h2>
                                     <div className="flex gap-4">
                                         <button onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() - 1)))} className="w-12 h-12 flex items-center justify-center bg-white border border-slate-200 rounded-2xl hover:bg-slate-50 transition-all shadow-sm"><Icon name="chevron-left" /></button>
-                                        <button onClick={() => setCurrentDate(new Date())} className="px-6 h-12 bg-white border border-slate-200 rounded-2xl text-sm font-black text-slate-700 hover:bg-slate-50 transition-all shadow-sm">Today</button>
+                                        <button onClick={() => setCurrentDate(new Date())} className="px-8 h-12 bg-white border border-slate-200 rounded-2xl text-xs font-black text-slate-700 hover:bg-slate-50 transition-all shadow-sm uppercase tracking-widest">Today</button>
                                         <button onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() + 1)))} className="w-12 h-12 flex items-center justify-center bg-white border border-slate-200 rounded-2xl hover:bg-slate-50 transition-all shadow-sm"><Icon name="chevron-right" /></button>
                                     </div>
                                 </div>
-                                <div className="calendar-grid bg-slate-50 text-center py-4 border-b border-slate-100">
-                                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => <div key={day} className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{day}</div>)}
+                                <div className="calendar-grid bg-white text-center py-6 border-b border-slate-50">
+                                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => <div key={day} className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">{day}</div>)}
                                 </div>
                                 <div className="calendar-grid bg-white">{renderCalendar()}</div>
                             </div>
                         )}
                     </main>
 
+                    {/* Submission Modal */}
                     {isModalOpen && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-xl animate-in fade-in duration-300">
-                            <div className="bg-white w-full max-w-xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in slide-in-from-bottom-8 duration-300 max-h-[90vh] overflow-y-auto">
-                                <div className="p-10 pb-0 flex justify-between items-start">
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-900/70 backdrop-blur-xl animate-in fade-in duration-300">
+                            <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in slide-in-from-bottom-8 duration-500 max-h-[90vh] overflow-y-auto">
+                                <div className="p-8 sm:p-12 pb-0 flex justify-between items-start sticky top-0 bg-white z-10">
                                     <div>
-                                        <h3 className="text-3xl font-black text-slate-900 tracking-tight">{isAdmin ? "Publish Event" : "Submit Hub Event"}</h3>
-                                        <p className="text-slate-400 text-sm font-medium mt-1">Let the community know what's coming up.</p>
+                                        <h3 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tighter">{isAdmin ? "New Event" : "Suggest Event"}</h3>
+                                        <p className="text-slate-400 text-sm font-medium mt-2">Help the community grow by sharing an event.</p>
                                     </div>
-                                    <button onClick={() => setIsModalOpen(false)} className="bg-slate-100 hover:bg-red-50 text-slate-400 hover:text-red-500 w-10 h-10 rounded-2xl flex items-center justify-center transition-all"><Icon name="x" size={20} /></button>
+                                    <button onClick={() => setIsModalOpen(false)} className="bg-slate-50 hover:bg-red-50 text-slate-400 hover:text-red-500 w-12 h-12 rounded-2xl flex items-center justify-center transition-all"><Icon name="x" size={24} /></button>
                                 </div>
                                 
-                                <form onSubmit={handleAddEvent} className="p-10 space-y-6">
-                                    <div className="space-y-6">
-                                        <div className="grid gap-6">
-                                            <div className="space-y-2">
-                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">What is it called?</label>
-                                                <input required type="text" placeholder="e.g. Tenby Food Festival" className="w-full bg-slate-50 px-6 py-4 rounded-3xl border border-slate-100 focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 outline-none transition-all font-bold" value={newEvent.title} onChange={e => setNewEvent({...newEvent, title: e.target.value})} />
-                                            </div>
-                                            
-                                            <div className="grid grid-cols-2 gap-6">
-                                                <div className="space-y-2">
-                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Date</label>
-                                                    <input required type="date" className="w-full bg-slate-50 px-6 py-4 rounded-3xl border border-slate-100 focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 outline-none transition-all font-bold" value={newEvent.date} onChange={e => setNewEvent({...newEvent, date: e.target.value})} />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Time</label>
-                                                    <input required type="time" className="w-full bg-slate-50 px-6 py-4 rounded-3xl border border-slate-100 focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 outline-none transition-all font-bold" value={newEvent.time} onChange={e => setNewEvent({...newEvent, time: e.target.value})} />
-                                                </div>
-                                            </div>
-
-                                            <div className="space-y-2">
-                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Where is it?</label>
-                                                <input required type="text" placeholder="e.g. Harbor Square" className="w-full bg-slate-50 px-6 py-4 rounded-3xl border border-slate-100 focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 outline-none transition-all font-bold" value={newEvent.location} onChange={e => setNewEvent({...newEvent, location: e.target.value})} />
-                                            </div>
-
-                                            <div className="space-y-2">
-                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Contact Details</label>
-                                                <input type="text" placeholder="e.g. organiser@gmail.com" className="w-full bg-slate-50 px-6 py-4 rounded-3xl border border-slate-100 focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 outline-none transition-all font-bold" value={newEvent.contact} onChange={e => setNewEvent({...newEvent, contact: e.target.value})} />
-                                            </div>
-
-                                            <div className="space-y-2">
-                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Description</label>
-                                                <textarea rows="3" placeholder="Tell us more about what's happening..." className="w-full bg-slate-50 px-6 py-4 rounded-3xl border border-slate-100 focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 outline-none transition-all font-medium" value={newEvent.description} onChange={e => setNewEvent({...newEvent, description: e.target.value})}></textarea>
-                                            </div>
+                                <form onSubmit={handleAddEvent} className="p-8 sm:p-12 space-y-8">
+                                    <div className="grid gap-8">
+                                        <div className="space-y-3">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">What is it called?</label>
+                                            <input required type="text" placeholder="e.g. Village Market Day" className="w-full bg-slate-50 px-8 py-5 rounded-3xl border border-slate-100 focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 outline-none transition-all font-bold text-lg" value={newEvent.title} onChange={e => setNewEvent({...newEvent, title: e.target.value})} />
                                         </div>
                                         
-                                        <button type="submit" className="w-full py-5 rounded-3xl bg-indigo-600 text-white font-black text-lg hover:bg-indigo-700 shadow-2xl shadow-indigo-200 transition-all active:scale-95">
-                                            {isAdmin ? "Publish Hub Event" : "Submit for Hub Review"}
-                                        </button>
-                                        
-                                        <div className="pt-6 border-t border-slate-100 text-center">
-                                            <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">Authenticated Session ID</p>
-                                            <code className="text-[9px] text-slate-400 block mt-1">{user?.uid}</code>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                                            <div className="space-y-3">
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Date</label>
+                                                <input required type="date" className="w-full bg-slate-50 px-8 py-5 rounded-3xl border border-slate-100 focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 outline-none transition-all font-bold" value={newEvent.date} onChange={e => setNewEvent({...newEvent, date: e.target.value})} />
+                                            </div>
+                                            <div className="space-y-3">
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Start Time</label>
+                                                <input required type="time" className="w-full bg-slate-50 px-8 py-5 rounded-3xl border border-slate-100 focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 outline-none transition-all font-bold" value={newEvent.time} onChange={e => setNewEvent({...newEvent, time: e.target.value})} />
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-3">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Where is it happening?</label>
+                                            <input required type="text" placeholder="e.g. Town Hall" className="w-full bg-slate-50 px-8 py-5 rounded-3xl border border-slate-100 focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 outline-none transition-all font-bold" value={newEvent.location} onChange={e => setNewEvent({...newEvent, location: e.target.value})} />
+                                        </div>
+
+                                        <div className="space-y-3">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Contact Details</label>
+                                            <input type="text" placeholder="Email or Phone Number" className="w-full bg-slate-50 px-8 py-5 rounded-3xl border border-slate-100 focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 outline-none transition-all font-bold" value={newEvent.contact} onChange={e => setNewEvent({...newEvent, contact: e.target.value})} />
+                                        </div>
+
+                                        <div className="space-y-3">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Tell us more</label>
+                                            <textarea rows="3" placeholder="Description of the event..." className="w-full bg-slate-50 px-8 py-5 rounded-3xl border border-slate-100 focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 outline-none transition-all font-medium text-slate-600" value={newEvent.description} onChange={e => setNewEvent({...newEvent, description: e.target.value})}></textarea>
                                         </div>
                                     </div>
+                                    
+                                    <button type="submit" className="w-full py-6 rounded-3xl bg-indigo-600 text-white font-black text-xl hover:bg-indigo-700 shadow-2xl shadow-indigo-200 transition-all active:scale-95">
+                                        {isAdmin ? "Publish Event Now" : "Send for Hub Review"}
+                                    </button>
                                 </form>
                             </div>
                         </div>
