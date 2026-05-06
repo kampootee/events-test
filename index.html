@@ -17,7 +17,9 @@
       EXTERNAL CONFIGURATION:
       To hide your keys from GitHub:
       1. Create a file named 'config.js' in the same folder as this HTML file.
-      2. Paste your config there: window.FIREBASE_CONFIG = { apiKey: "...", ... };
+      2. Paste your config there: 
+         window.FIREBASE_CONFIG = { apiKey: "...", ... };
+         window.ADMIN_UID = "FMv14irUYzes4glPHCNV8BexIqK2";
       3. Create a '.gitignore' file and add 'config.js' to it.
     -->
     <script src="config.js"></script>
@@ -58,8 +60,9 @@
 
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'community-calendar-app';
         
-        // ADMIN CONFIGURATION
-        const ADMIN_UID = "YOUR_ADMIN_UID_HERE"; 
+        // --- ADMIN CONFIGURATION ---
+        // Pulling from config.js for security.
+        const ADMIN_UID = window.ADMIN_UID || "DEVELOPMENT_MODE"; 
 
         const Icon = ({ name, size = 18, className = "" }) => {
             const containerRef = useRef(null);
@@ -346,7 +349,7 @@
                                         <div className="text-center py-24 bg-white rounded-[40px] border-4 border-dashed border-slate-100">
                                             <Icon name="calendar" size={48} className="text-slate-200 mx-auto mb-4" />
                                             <h3 className="text-2xl font-bold text-slate-800 tracking-tight">{activeTag ? `No events in ${activeTag}` : 'The calendar is quiet...'}</h3>
-                                            {activeTag && <button onClick={() => setActiveTag(null)} className="mt-6 text-indigo-600 font-bold hover:underline bg-indigo-50 px-6 py-2 rounded-full">Show all events</button>}
+                                            {activeTag && <button onClick={() => setActiveTag(null)} className="mt-6 text-indigo-600 font-bold hover:underline bg-indigo-50 px-6 py-2 rounded-full shadow-sm">Show all events</button>}
                                         </div>
                                     )}
                                 </div>
@@ -428,7 +431,7 @@
                                     <div className="mt-4 pt-6 border-t border-slate-100">
                                         <div className="flex items-center justify-between bg-slate-50 border border-slate-200 p-3 rounded-2xl">
                                             <div className="overflow-hidden">
-                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Your User Identifier (for Admin Setup)</p>
+                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Your User Identifier (Admin Logged In)</p>
                                                 <code className="text-[10px] text-slate-600 truncate block">{user?.uid}</code>
                                             </div>
                                             <button type="button" onClick={copyUID} className={`p-3 rounded-xl transition-all shadow-sm ${copyFeedback ? 'bg-green-500 text-white' : 'bg-white text-slate-500 hover:text-indigo-600'}`}>
