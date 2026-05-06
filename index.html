@@ -49,11 +49,16 @@
             transform: translateY(-2px);
         }
 
-        .category-Social { background-color: #e0f2fe; color: #0369a1; }
-        .category-Culture { background-color: #fef3c7; color: #b45309; }
-        .category-Environment { background-color: #dcfce7; color: #15803d; }
-        .category-Meeting { background-color: #f1f5f9; color: #475569; }
-        .category-General { background-color: #fae8ff; color: #a21caf; }
+        /* Tag Styles */
+        .tag-pill {
+            background-color: #f1f5f9;
+            color: #475569;
+            transition: all 0.2s;
+        }
+        .tag-pill:hover {
+            background-color: #e0f2fe;
+            color: #0284c7;
+        }
 
         /* Custom scrollbar */
         ::-webkit-scrollbar { width: 6px; }
@@ -79,6 +84,17 @@
         const appId = window.FIREBASE_APP_ID || 'localevents-app';
 
         const HEADER_IMAGE_URL = "img/header.jpg";
+
+        const AVAILABLE_TAGS = [
+            "Food Festivals", 
+            "Live Music", 
+            "Family Fun Days", 
+            "Arts & Crafts", 
+            "Wellness Meetup", 
+            "Holiday Weekenders", 
+            "Farmers Market", 
+            "Coffee Mornings"
+        ];
 
         const Icon = ({ name, size = 18, className = "" }) => {
             const containerRef = useRef(null);
@@ -116,7 +132,7 @@
             const isAdmin = user?.uid === ADMIN_UID;
 
             const [newEvent, setNewEvent] = useState({
-                title: '', date: '', time: '', location: '', description: '', category: 'General', contact: ''
+                title: '', date: '', time: '', location: '', description: '', tags: [], contact: ''
             });
 
             useEffect(() => {
@@ -152,7 +168,10 @@
                     filtered = filtered.filter(e => e.status === 'approved' || (user && e.createdBy === user.uid));
                 }
                 if (activeTag) {
-                    filtered = filtered.filter(e => e.location?.toLowerCase() === activeTag.toLowerCase());
+                    filtered = filtered.filter(e => 
+                        e.location?.toLowerCase() === activeTag.toLowerCase() ||
+                        (e.tags && e.tags.some(t => t.toLowerCase() === activeTag.toLowerCase()))
+                    );
                 }
                 return filtered.sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
             }, [events, activeTag, isAdmin, user]);
@@ -168,7 +187,7 @@
                         createdBy: user.uid,
                         createdAt: new Date().toISOString()
                     });
-                    setNewEvent({ title: '', date: '', time: '', location: '', description: '', category: 'General', contact: '' });
+                    setNewEvent({ title: '', date: '', time: '', location: '', description: '', tags: [], contact: '' });
                     setIsModalOpen(false);
                 } catch (error) { console.error(error); }
             };
@@ -183,18 +202,14 @@
                 await deleteDoc(eventDoc);
             };
 
-            // Function to generate and trigger .ics file download for mobile users
             const downloadCalendarFile = (event) => {
                 const formatDate = (dateStr, timeStr) => {
                     const combined = new Date(`${dateStr}T${timeStr}`);
                     return combined.toISOString().replace(/-|:|\.\d+/g, '');
                 };
-
                 const start = formatDate(event.date, event.time);
-                // Default to 1 hour duration
                 const endDate = new Date(new Date(`${event.date}T${event.time}`).getTime() + 60 * 60 * 1000);
                 const end = endDate.toISOString().replace(/-|:|\.\d+/g, '');
-
                 const icsData = [
                     "BEGIN:VCALENDAR",
                     "VERSION:2.0",
@@ -207,7 +222,6 @@
                     "END:VEVENT",
                     "END:VCALENDAR"
                 ].join("\n");
-
                 const blob = new Blob([icsData], { type: "text/calendar;charset=utf-8" });
                 const link = document.createElement("a");
                 link.href = window.URL.createObjectURL(blob);
@@ -215,6 +229,15 @@
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
+            };
+
+            const toggleTag = (tag) => {
+                setNewEvent(prev => ({
+                    ...prev,
+                    tags: prev.tags.includes(tag) 
+                        ? prev.tags.filter(t => t !== tag) 
+                        : [...prev.tags, tag]
+                }));
             };
 
             const renderCalendar = () => {
@@ -309,8 +332,8 @@
                             <div className="space-y-6">
                                 {activeTag && (
                                     <div className="flex items-center gap-3 bg-white border border-sky-100 p-3 pl-5 rounded-2xl shadow-sm animate-in slide-in-from-right-4">
-                                        <Icon name="map-pin" size={18} className="text-sky-500" /> 
-                                        <span className="text-sm font-bold text-slate-700">Showing events in <span className="text-sky-600">{activeTag}</span></span>
+                                        <Icon name="tag" size={18} className="text-sky-500" /> 
+                                        <span className="text-sm font-bold text-slate-700">Showing: <span className="text-sky-600">{activeTag}</span></span>
                                         <button onClick={() => setActiveTag(null)} className="ml-auto bg-slate-50 hover:bg-red-50 p-2 rounded-2xl text-slate-400 hover:text-red-500 transition-colors"><Icon name="x" size={16}/></button>
                                     </div>
                                 )}
@@ -327,8 +350,12 @@
                                                     </div>
                                                     
                                                     <div className="flex-grow min-w-0">
-                                                        <div className="flex items-center gap-2 mb-1">
-                                                            <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border border-slate-100 shadow-sm category-${event.category}`}>{event.category}</span>
+                                                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                                            {event.tags && event.tags.map(t => (
+                                                                <button key={t} onClick={() => setActiveTag(t)} className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full shadow-sm tag-pill border border-slate-100">
+                                                                    {t}
+                                                                </button>
+                                                            ))}
                                                             {event.status === 'pending' && <span className="text-[8px] font-black bg-amber-500 text-white px-2 py-0.5 rounded-full shadow-md">Reviewing</span>}
                                                         </div>
                                                         
@@ -342,7 +369,6 @@
                                                     </div>
 
                                                     <div className="flex flex-row sm:flex-col gap-2 shrink-0 items-center">
-                                                        {/* Add to Calendar Button - Visible on mobile only */}
                                                         {event.status === 'approved' && (
                                                             <button 
                                                                 onClick={() => downloadCalendarFile(event)} 
@@ -407,7 +433,7 @@
                                         <h3 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tighter">{isAdmin ? "New Event" : "Suggest Event"}</h3>
                                         <p className="text-slate-400 text-sm font-medium mt-2">Help the community grow by sharing an event.</p>
                                     </div>
-                                    <button onClick={() => setIsModalOpen(false)} className="bg-slate-50 hover:bg-red-50 text-slate-400 hover:text-red-500 w-12 h-12 rounded-2xl flex items-center justify-center transition-all"><Icon name="x" size={24} /></button>
+                                    <button onClick={() => setIsModalOpen(false)} className="bg-slate-100 hover:bg-red-50 text-slate-400 hover:text-red-500 w-12 h-12 rounded-2xl flex items-center justify-center transition-all"><Icon name="x" size={24} /></button>
                                 </div>
                                 
                                 <form onSubmit={handleAddEvent} className="p-8 sm:p-12 space-y-8">
@@ -431,6 +457,24 @@
                                         <div className="space-y-3">
                                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Where is it happening?</label>
                                             <input required type="text" placeholder="e.g. Town Hall" className="w-full bg-slate-50 px-8 py-5 rounded-3xl border border-slate-100 focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 outline-none transition-all font-bold" value={newEvent.location} onChange={e => setNewEvent({...newEvent, location: e.target.value})} />
+                                        </div>
+
+                                        <div className="space-y-3">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">What kind of event is it? (Select all that apply)</label>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                {AVAILABLE_TAGS.map(tag => (
+                                                    <label key={tag} className={`flex items-center gap-3 p-3 rounded-2xl border transition-all cursor-pointer ${newEvent.tags.includes(tag) ? 'bg-sky-50 border-sky-400 text-sky-700' : 'bg-slate-50 border-slate-100 text-slate-500 hover:border-sky-200'}`}>
+                                                        <input 
+                                                            type="checkbox" 
+                                                            className="hidden" 
+                                                            checked={newEvent.tags.includes(tag)} 
+                                                            onChange={() => toggleTag(tag)} 
+                                                        />
+                                                        <Icon name={newEvent.tags.includes(tag) ? "check-circle" : "circle"} size={16} className={newEvent.tags.includes(tag) ? "text-sky-600" : "text-slate-300"} />
+                                                        <span className="text-xs font-bold">{tag}</span>
+                                                    </label>
+                                                ))}
+                                            </div>
                                         </div>
 
                                         <div className="space-y-3">
