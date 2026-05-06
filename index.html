@@ -36,9 +36,6 @@
 
         // --- FIREBASE CONFIGURATION ---
         
-        /**
-         * Your specific localevents-2f7e4 configuration.
-         */
         const manualConfig = {
             apiKey: "AIzaSyDAUR74Lfb2RYae0qDj9FLK4YdX4Cf-qic",
             authDomain: "localevents-2f7e4.firebaseapp.com",
@@ -63,18 +60,8 @@
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'community-calendar-app';
         
         // --- ADMIN CONFIGURATION ---
-        /**
-         * STEP 2: Become Admin
-         * 1. Open the file in a browser.
-         * 2. Click "Submit Event".
-         * 3. Copy the "Your User Identifier" at the bottom.
-         * 4. Paste it below.
-         */
         const ADMIN_UID = "YOUR_ADMIN_UID_HERE"; 
 
-        /**
-         * Stable Icon Component
-         */
         const Icon = ({ name, size = 18, className = "" }) => {
             const containerRef = useRef(null);
             useEffect(() => {
@@ -98,6 +85,8 @@
             const [user, setUser] = useState(null);
             const [events, setEvents] = useState([]);
             const [isLoading, setIsLoading] = useState(true);
+            const [errorMsg, setErrorMsg] = useState(null);
+            const [errorCode, setErrorCode] = useState(null);
             const [viewMode, setViewMode] = useState('list'); 
             const [isModalOpen, setIsModalOpen] = useState(false);
             const [currentDate, setCurrentDate] = useState(new Date());
@@ -107,7 +96,7 @@
             // Initialization Check
             if (!firebaseConfig) {
                 return (
-                    <div className="min-h-screen flex items-center justify-center p-6 bg-slate-100 text-center">
+                    <div className="min-h-screen flex items-center justify-center p-6 bg-slate-100 text-center text-slate-800">
                         <div className="bg-white p-8 rounded-3xl shadow-xl max-w-md w-full">
                             <Icon name="alert-circle" size={48} className="text-red-500 mx-auto mb-4" />
                             <h2 className="text-xl font-bold mb-2">Configuration Missing</h2>
@@ -144,25 +133,54 @@
                         }
                     } catch (error) {
                         console.error("Auth error:", error);
+                        setErrorCode(error.code);
+                        if (error.code === 'auth/network-request-failed') {
+                            setErrorMsg("Network request failed. This is usually caused by an Ad-Blocker or Firewall blocking Firebase.");
+                        } else {
+                            setErrorMsg("Authentication failed. Ensure 'Anonymous Auth' is enabled in your Firebase Console.");
+                        }
+                        setIsLoading(false);
                     }
                 };
                 initAuth();
-                const unsubscribe = onAuthStateChanged(authInstance, (u) => setUser(u));
+                const unsubscribe = onAuthStateChanged(authInstance, (u) => {
+                    if (u) {
+                        setUser(u);
+                        setErrorMsg(null);
+                        setErrorCode(null);
+                    }
+                });
                 return () => unsubscribe();
             }, [authInstance]);
 
-            // Data Stream
+            // Data Stream with Timeout
             useEffect(() => {
                 if (!user) return;
+                
+                const timeout = setTimeout(() => {
+                    if (isLoading) {
+                        setErrorMsg("Connection timed out. Check your Firestore rules and internet connection.");
+                        setIsLoading(false);
+                    }
+                }, 10000);
+
                 const eventsCollection = collection(dbInstance, 'artifacts', appId, 'public', 'data', 'events');
                 const unsubscribe = onSnapshot(query(eventsCollection), (snapshot) => {
+                    clearTimeout(timeout);
                     setEvents(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
                     setIsLoading(false);
+                    setErrorMsg(null);
                 }, (err) => {
+                    clearTimeout(timeout);
                     console.error("Firestore error:", err);
+                    setErrorMsg("Firestore permission denied. Check your Security Rules.");
                     setIsLoading(false);
                 });
-                return () => unsubscribe();
+
+                return () => {
+                    unsubscribe();
+                    clearTimeout(timeout);
+                };
             }, [user, dbInstance]);
 
             // Filter & Sort
@@ -252,6 +270,44 @@
                 <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 space-y-4">
                     <Icon name="loader-2" className="animate-spin text-indigo-600" size={40} />
                     <p className="text-slate-500 font-medium tracking-tight">Syncing with Community Hub...</p>
+                </div>
+            );
+
+            if (errorMsg) return (
+                <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50 text-center">
+                    <div className="bg-white p-8 rounded-[2rem] shadow-2xl max-w-lg w-full border border-red-100">
+                        <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                            <Icon name="wifi-off" size={40} className="text-red-500" />
+                        </div>
+                        <h2 className="text-2xl font-black text-slate-800 mb-2 tracking-tight">Connection Issue</h2>
+                        <p className="text-slate-500 text-sm mb-8 leading-relaxed px-4">{errorMsg}</p>
+                        
+                        {errorCode === 'auth/network-request-failed' && (
+                            <div className="text-left bg-slate-50 rounded-2xl p-5 mb-8 border border-slate-200">
+                                <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                    <Icon name="help-circle" size={14}/> Troubleshooting Steps:
+                                </p>
+                                <ul className="text-sm text-slate-600 space-y-3">
+                                    <li className="flex gap-2">
+                                        <span className="font-bold text-indigo-600">1.</span>
+                                        <span>Disable <strong>Ad-Blockers</strong> (uBlock, AdBlock, etc.) for this page.</span>
+                                    </li>
+                                    <li className="flex gap-2">
+                                        <span className="font-bold text-indigo-600">2.</span>
+                                        <span>Ensure <strong>Anonymous Authentication</strong> is enabled in Firebase Console.</span>
+                                    </li>
+                                    <li className="flex gap-2">
+                                        <span className="font-bold text-indigo-600">3.</span>
+                                        <span>Try opening the file in an <strong>Incognito Window</strong>.</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        )}
+                        
+                        <button onClick={() => window.location.reload()} className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black text-lg hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 active:scale-95">
+                            Retry Connection
+                        </button>
+                    </div>
                 </div>
             );
 
@@ -361,7 +417,7 @@
                             <div className="bg-white w-full max-w-lg rounded-[40px] shadow-2xl overflow-hidden">
                                 <div className="p-8 border-b border-slate-50 flex justify-between items-center bg-indigo-50/50">
                                     <h3 className="text-2xl font-black text-indigo-950 tracking-tight">{isAdmin ? "Publish Event" : "Submit Event"}</h3>
-                                    <button onClick={() => setIsModalOpen(false)} className="bg-white p-2 rounded-full shadow-md text-slate-400"><Icon name="plus" className="rotate-45" size={24} /></button>
+                                    <button onClick={() => setIsModalOpen(false)} className="bg-white p-2 rounded-full shadow-md text-slate-400 hover:text-indigo-600 transition-all"><Icon name="plus" className="rotate-45" size={24} /></button>
                                 </div>
                                 <form onSubmit={handleAddEvent} className="p-8 space-y-5">
                                     {!isAdmin && (
