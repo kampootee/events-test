@@ -78,8 +78,8 @@
         const ADMIN_UID = window.ADMIN_UID;
         const appId = window.FIREBASE_APP_ID || 'localevents-app';
 
-        // Pembrokeshire image banner (Tenby Harbour)
-        const HEADER_IMAGE_URL = "https://images.unsplash.com/photo-1589136561243-d3450d03227a?q=80&w=2070&auto=format&fit=crop";
+        // Updated to the local path as requested
+        const HEADER_IMAGE_URL = "img/header.jpg";
 
         const Icon = ({ name, size = 18, className = "" }) => {
             const containerRef = useRef(null);
@@ -257,8 +257,9 @@
                     <div className="relative w-full h-[300px] sm:h-[400px] overflow-hidden">
                         <img 
                             src={HEADER_IMAGE_URL} 
-                            alt="Community Hero" 
+                            alt="Pembrokeshire Header" 
                             className="absolute inset-0 w-full h-full object-cover"
+                            onerror="this.src='https://images.unsplash.com/photo-1589136561243-d3450d03227a?q=80&w=2070&auto=format&fit=crop'"
                         />
                         <div className="absolute inset-0 hero-gradient flex items-end">
                             <div className="max-w-6xl mx-auto px-6 w-full pb-10 sm:pb-16 text-white animate-in fade-in slide-in-from-bottom-6 duration-700">
