@@ -183,6 +183,40 @@
                 await deleteDoc(eventDoc);
             };
 
+            // Function to generate and trigger .ics file download for mobile users
+            const downloadCalendarFile = (event) => {
+                const formatDate = (dateStr, timeStr) => {
+                    const combined = new Date(`${dateStr}T${timeStr}`);
+                    return combined.toISOString().replace(/-|:|\.\d+/g, '');
+                };
+
+                const start = formatDate(event.date, event.time);
+                // Default to 1 hour duration
+                const endDate = new Date(new Date(`${event.date}T${event.time}`).getTime() + 60 * 60 * 1000);
+                const end = endDate.toISOString().replace(/-|:|\.\d+/g, '');
+
+                const icsData = [
+                    "BEGIN:VCALENDAR",
+                    "VERSION:2.0",
+                    "BEGIN:VEVENT",
+                    `SUMMARY:${event.title}`,
+                    `DTSTART:${start}`,
+                    `DTEND:${end}`,
+                    `LOCATION:${event.location}`,
+                    `DESCRIPTION:${event.description || ''}`,
+                    "END:VEVENT",
+                    "END:VCALENDAR"
+                ].join("\n");
+
+                const blob = new Blob([icsData], { type: "text/calendar;charset=utf-8" });
+                const link = document.createElement("a");
+                link.href = window.URL.createObjectURL(blob);
+                link.setAttribute("download", `${event.title.replace(/\s+/g, '_')}.ics`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            };
+
             const renderCalendar = () => {
                 const year = currentDate.getFullYear();
                 const month = currentDate.getMonth();
@@ -243,7 +277,7 @@
                                         <Icon name="calendar" size={14} /> Calendar
                                     </button>
                                 </div>
-                                <button onClick={() => setIsModalOpen(true)} className="bg-slate-900 hover:bg-slate-800 text-white px-5 sm:px-6 py-2 sm:py-3 rounded-xl flex items-center gap-2 text-xs sm:text-sm font-bold shadow-xl active:scale-95 transition-all">
+                                <button onClick={() => setIsModalOpen(true)} className="bg-slate-900 hover:bg-slate-800 text-white px-5 sm:px-6 py-2.5 sm:py-3 rounded-xl flex items-center gap-2 text-xs sm:text-sm font-bold shadow-xl active:scale-95 transition-all">
                                     <Icon name="plus" size={16} className="text-sky-400" />
                                     {isAdmin ? "New Event" : "Submit"}
                                 </button>
@@ -307,7 +341,21 @@
                                                         </div>
                                                     </div>
 
-                                                    <div className="flex flex-row sm:flex-col gap-2 shrink-0">
+                                                    <div className="flex flex-row sm:flex-col gap-2 shrink-0 items-center">
+                                                        {/* Add to Calendar Button - Visible on mobile only */}
+                                                        {event.status === 'approved' && (
+                                                            <button 
+                                                                onClick={() => downloadCalendarFile(event)} 
+                                                                title="Add to Calendar" 
+                                                                className="md:hidden w-10 h-10 bg-slate-50 border border-slate-100 text-slate-400 rounded-xl flex items-center justify-center hover:bg-sky-50 hover:text-sky-600 transition-all active:scale-90"
+                                                            >
+                                                                <div className="relative">
+                                                                    <Icon name="calendar" size={18} />
+                                                                    <span className="absolute -top-1 -right-1 text-[10px] font-black text-sky-600 bg-white rounded-full leading-none">+</span>
+                                                                </div>
+                                                            </button>
+                                                        )}
+                                                        
                                                         {isAdmin && event.status === 'pending' && (
                                                             <button onClick={() => approveEvent(event.id)} className="w-10 h-10 bg-green-500 text-white rounded-xl flex items-center justify-center hover:bg-green-600 shadow-md transition-all active:scale-90">
                                                                 <Icon name="check" size={20} />
@@ -351,10 +399,9 @@
                         )}
                     </main>
 
-                    {/* Submission Modal */}
                     {isModalOpen && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-900/70 backdrop-blur-xl animate-in fade-in duration-300">
-                            <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in slide-in-from-bottom-8 duration-300 max-h-[90vh] overflow-y-auto">
+                            <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in slide-in-from-bottom-8 duration-500 max-h-[90vh] overflow-y-auto">
                                 <div className="p-8 sm:p-12 pb-0 flex justify-between items-start sticky top-0 bg-white z-10">
                                     <div>
                                         <h3 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tighter">{isAdmin ? "New Event" : "Suggest Event"}</h3>
