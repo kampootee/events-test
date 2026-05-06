@@ -16,7 +16,7 @@
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
         body { font-family: 'Inter', sans-serif; }
         .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
-        /* Custom scrollbar for better look */
+        /* Custom scrollbar */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: #f1f5f9; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
@@ -26,28 +26,50 @@
 <body class="bg-slate-50 text-slate-900">
     <div id="root"></div>
 
-    <!-- data-type="module" tells Babel to output an ES module -->
     <script type="text/babel" data-type="module">
         const { useState, useEffect, useMemo, useRef } = React;
 
-        // Firebase Setup - Using 11.6.1 ESM
+        // Firebase Setup - Using 11.6.1 ESM for broad compatibility
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, query, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Global environment variables provided by the environment
-        // Safely check for variables to prevent "White Page" crash when running locally
+        // --- FIREBASE CONFIGURATION ---
+        
+        /**
+         * Your specific localevents-2f7e4 configuration.
+         */
+        const manualConfig = {
+            apiKey: "AIzaSyDAUR74Lfb2RYae0qDj9FLK4YdX4Cf-qic",
+            authDomain: "localevents-2f7e4.firebaseapp.com",
+            projectId: "localevents-2f7e4",
+            storageBucket: "localevents-2f7e4.firebasestorage.app",
+            messagingSenderId: "364858297232",
+            appId: "1:364858297232:web:f442ed40221fd0f6e8c115",
+            measurementId: "G-JHRW8HD7K1"
+        }; 
+
         let firebaseConfig = null;
         try {
-            firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+            if (manualConfig && manualConfig.apiKey !== "YOUR_API_KEY") {
+                firebaseConfig = manualConfig;
+            } else if (typeof __firebase_config !== 'undefined') {
+                firebaseConfig = JSON.parse(__firebase_config);
+            }
         } catch (e) {
             console.error("Failed to parse firebase config", e);
         }
 
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'community-calendar-app';
         
-        // --- CONFIGURATION ---
-        // Copy your UID from the bottom of the "Add Event" modal and paste it here
+        // --- ADMIN CONFIGURATION ---
+        /**
+         * STEP 2: Become Admin
+         * 1. Open the file in a browser.
+         * 2. Click "Submit Event".
+         * 3. Copy the "Your User Identifier" at the bottom.
+         * 4. Paste it below.
+         */
         const ADMIN_UID = "YOUR_ADMIN_UID_HERE"; 
 
         /**
@@ -55,7 +77,6 @@
          */
         const Icon = ({ name, size = 18, className = "" }) => {
             const containerRef = useRef(null);
-
             useEffect(() => {
                 if (window.lucide && containerRef.current) {
                     const i = document.createElement('i');
@@ -70,7 +91,6 @@
                     });
                 }
             }, [name, size, className]);
-
             return <span ref={containerRef} className="inline-flex items-center justify-center pointer-events-none"></span>;
         };
 
@@ -87,32 +107,20 @@
             // Initialization Check
             if (!firebaseConfig) {
                 return (
-                    <div className="min-h-screen flex items-center justify-center p-6 bg-slate-100">
-                        <div className="bg-white p-8 rounded-3xl shadow-xl max-w-md w-full border border-slate-200">
-                            <div className="bg-amber-100 w-16 h-16 rounded-full flex items-center justify-center mb-6">
-                                <Icon name="alert-triangle" className="text-amber-600" size={32} />
-                            </div>
-                            <h2 className="text-2xl font-black text-slate-800 mb-4 tracking-tight">Setup Required</h2>
-                            <p className="text-slate-600 leading-relaxed mb-6">
-                                To run this application locally, you need to provide a Firebase configuration object. 
-                                <br/><br/>
-                                1. Create a Firebase project at <span className="font-mono text-xs bg-slate-100 px-1">console.firebase.google.com</span>.
-                                <br/>
-                                2. Copy the config object and replace <span className="font-mono text-xs bg-slate-100 px-1">__firebase_config</span> in the code.
-                            </p>
-                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Running in Sandbox?</p>
-                                <p className="text-xs text-slate-500 mt-1">If you are seeing this inside the interactive preview, please refresh the page.</p>
-                            </div>
+                    <div className="min-h-screen flex items-center justify-center p-6 bg-slate-100 text-center">
+                        <div className="bg-white p-8 rounded-3xl shadow-xl max-w-md w-full">
+                            <Icon name="alert-circle" size={48} className="text-red-500 mx-auto mb-4" />
+                            <h2 className="text-xl font-bold mb-2">Configuration Missing</h2>
+                            <p className="text-slate-500 text-sm">Please check your manualConfig object in the code.</p>
                         </div>
                     </div>
                 );
             }
 
             // Initialize Services
-            const app = useMemo(() => initializeApp(firebaseConfig), []);
-            const auth = useMemo(() => getAuth(app), [app]);
-            const db = useMemo(() => getFirestore(app), [app]);
+            const appInstance = useMemo(() => initializeApp(firebaseConfig), []);
+            const authInstance = useMemo(() => getAuth(appInstance), [appInstance]);
+            const dbInstance = useMemo(() => getFirestore(appInstance), [appInstance]);
 
             const isAdmin = user?.uid === ADMIN_UID;
 
@@ -130,23 +138,23 @@
                 const initAuth = async () => {
                     try {
                         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                            await signInWithCustomToken(auth, __initial_auth_token);
+                            await signInWithCustomToken(authInstance, __initial_auth_token);
                         } else {
-                            await signInAnonymously(auth);
+                            await signInAnonymously(authInstance);
                         }
                     } catch (error) {
                         console.error("Auth error:", error);
                     }
                 };
                 initAuth();
-                const unsubscribe = onAuthStateChanged(auth, (u) => setUser(u));
+                const unsubscribe = onAuthStateChanged(authInstance, (u) => setUser(u));
                 return () => unsubscribe();
-            }, [auth]);
+            }, [authInstance]);
 
             // Data Stream
             useEffect(() => {
                 if (!user) return;
-                const eventsCollection = collection(db, 'artifacts', appId, 'public', 'data', 'events');
+                const eventsCollection = collection(dbInstance, 'artifacts', appId, 'public', 'data', 'events');
                 const unsubscribe = onSnapshot(query(eventsCollection), (snapshot) => {
                     setEvents(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
                     setIsLoading(false);
@@ -155,7 +163,7 @@
                     setIsLoading(false);
                 });
                 return () => unsubscribe();
-            }, [user, db]);
+            }, [user, dbInstance]);
 
             // Filter & Sort
             const displayEvents = useMemo(() => {
@@ -171,7 +179,7 @@
                 e.preventDefault();
                 if (!newEvent.title || !newEvent.date || !user) return;
                 try {
-                    const eventsCollection = collection(db, 'artifacts', appId, 'public', 'data', 'events');
+                    const eventsCollection = collection(dbInstance, 'artifacts', appId, 'public', 'data', 'events');
                     await addDoc(eventsCollection, {
                         ...newEvent,
                         status: isAdmin ? 'approved' : 'pending',
@@ -184,12 +192,12 @@
             };
 
             const approveEvent = async (id) => {
-                const eventDoc = doc(db, 'artifacts', appId, 'public', 'data', 'events', id);
+                const eventDoc = doc(dbInstance, 'artifacts', appId, 'public', 'data', 'events', id);
                 await updateDoc(eventDoc, { status: 'approved' });
             };
 
             const deleteEvent = async (id) => {
-                const eventDoc = doc(db, 'artifacts', appId, 'public', 'data', 'events', id);
+                const eventDoc = doc(dbInstance, 'artifacts', appId, 'public', 'data', 'events', id);
                 await deleteDoc(eventDoc);
             };
 
@@ -285,7 +293,7 @@
                                         </div>
                                     </div>
                                     {activeTag && (
-                                        <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 px-4 py-2 rounded-full text-amber-700 text-sm font-bold shadow-sm animate-in fade-in slide-in-from-right-4">
+                                        <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 px-4 py-2 rounded-full text-amber-700 text-sm font-bold shadow-sm">
                                             <Icon name="tag" size={14} className="text-amber-500" /> 
                                             <span>Events in: <strong>{activeTag}</strong></span>
                                             <button onClick={() => setActiveTag(null)} className="ml-1 p-1 hover:bg-amber-200 rounded-full transition-colors"><Icon name="x" size={14}/></button>
@@ -295,7 +303,7 @@
 
                                 <div className="grid gap-5">
                                     {displayEvents.length > 0 ? displayEvents.map(event => (
-                                        <div key={event.id} className={`bg-white p-6 rounded-3xl border transition-all relative ${event.status === 'pending' ? 'border-amber-200 bg-amber-50/20' : 'border-slate-200 shadow-sm hover:shadow-xl hover:border-indigo-100'}`}>
+                                        <div key={event.id} className={`bg-white p-6 rounded-3xl border transition-all relative ${event.status === 'pending' ? 'border-amber-200 bg-amber-50/20' : 'border-slate-200 shadow-sm hover:shadow-xl'}`}>
                                             <div className="flex flex-col md:flex-row md:items-center gap-6">
                                                 <div className={`flex-shrink-0 w-16 h-16 rounded-2xl flex flex-col items-center justify-center border shadow-sm ${event.status === 'pending' ? 'bg-amber-100 text-amber-600 border-amber-200' : 'bg-indigo-50 text-indigo-600 border-indigo-100'}`}>
                                                     <span className="text-[10px] font-black uppercase tracking-wider">{new Date(event.date).toLocaleDateString('en-US', { month: 'short' })}</span>
@@ -306,7 +314,7 @@
                                                         <span className="text-[10px] font-black tracking-widest uppercase bg-slate-100 px-2.5 py-1 rounded-full text-slate-500 border border-slate-200">{event.category}</span>
                                                         {event.status === 'pending' && <span className="text-[10px] font-black bg-amber-500 text-white px-2.5 py-1 rounded-full flex items-center gap-1 shadow-sm"><Icon name="clock" size={10}/> PENDING APPROVAL</span>}
                                                     </div>
-                                                    <h3 className="text-xl font-bold text-slate-900 group-hover:text-indigo-600">{event.title}</h3>
+                                                    <h3 className="text-xl font-bold text-slate-900">{event.title}</h3>
                                                     <p className="text-slate-600 text-sm mt-1 leading-relaxed">{event.description}</p>
                                                     <div className="flex flex-wrap gap-5 mt-5 text-sm font-semibold text-slate-500">
                                                         <div className="flex items-center gap-2 bg-slate-50 px-3 py-1 rounded-lg border border-slate-100"><Icon name="clock" size={14} className="text-indigo-500" />{event.time}</div>
@@ -324,8 +332,7 @@
                                     )) : (
                                         <div className="text-center py-24 bg-white rounded-[40px] border-4 border-dashed border-slate-100">
                                             <Icon name="calendar" size={48} className="text-slate-200 mx-auto mb-4" />
-                                            <h3 className="text-2xl font-bold text-slate-800">{activeTag ? `No events in ${activeTag}` : 'The calendar is quiet...'}</h3>
-                                            <p className="text-slate-400 mt-2">Check back soon or share your own event!</p>
+                                            <h3 className="text-2xl font-bold text-slate-800 tracking-tight">{activeTag ? `No events in ${activeTag}` : 'The calendar is quiet...'}</h3>
                                             {activeTag && <button onClick={() => setActiveTag(null)} className="mt-6 text-indigo-600 font-bold hover:underline bg-indigo-50 px-6 py-2 rounded-full">Show all events</button>}
                                         </div>
                                     )}
@@ -351,10 +358,10 @@
 
                     {isModalOpen && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-200">
-                            <div className="bg-white w-full max-w-lg rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in slide-in-from-bottom-8 duration-300">
+                            <div className="bg-white w-full max-w-lg rounded-[40px] shadow-2xl overflow-hidden">
                                 <div className="p-8 border-b border-slate-50 flex justify-between items-center bg-indigo-50/50">
-                                    <h3 className="text-2xl font-black text-indigo-950 tracking-tight">{isAdmin ? "Publish Event" : "Submit Community Event"}</h3>
-                                    <button onClick={() => setIsModalOpen(false)} className="bg-white p-2 rounded-full shadow-md text-slate-400 hover:text-indigo-600 transition-all"><Icon name="plus" className="rotate-45" size={24} /></button>
+                                    <h3 className="text-2xl font-black text-indigo-950 tracking-tight">{isAdmin ? "Publish Event" : "Submit Event"}</h3>
+                                    <button onClick={() => setIsModalOpen(false)} className="bg-white p-2 rounded-full shadow-md text-slate-400"><Icon name="plus" className="rotate-45" size={24} /></button>
                                 </div>
                                 <form onSubmit={handleAddEvent} className="p-8 space-y-5">
                                     {!isAdmin && (
