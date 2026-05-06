@@ -46,10 +46,6 @@
 
         // --- CONFIGURATION LOGIC ---
         
-        /**
-         * The app first looks for window.FIREBASE_CONFIG (from config.js).
-         * If not found, it falls back to the hardcoded config or environment variables.
-         */
         const firebaseConfig = window.FIREBASE_CONFIG || {
             apiKey: "AIzaSyDAUR74Lfb2RYae0qDj9FLK4YdX4Cf-qic",
             authDomain: "localevents-2f7e4.firebaseapp.com",
@@ -109,7 +105,8 @@
                 time: '',
                 location: '',
                 description: '',
-                category: 'General'
+                category: 'General',
+                contact: ''
             });
 
             // Auth Login
@@ -188,7 +185,7 @@
                         createdBy: user.uid,
                         createdAt: new Date().toISOString()
                     });
-                    setNewEvent({ title: '', date: '', time: '', location: '', description: '', category: 'General' });
+                    setNewEvent({ title: '', date: '', time: '', location: '', description: '', category: 'General', contact: '' });
                     setIsModalOpen(false);
                 } catch (error) { console.error("Post error:", error); }
             };
@@ -280,12 +277,8 @@
                             </div>
                             <div className="flex items-center gap-4">
                                 <div className="flex bg-slate-100 p-1 rounded-xl">
-                                    <button onClick={() => setViewMode('list')} className={`p-1.5 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}>
-                                        <Icon name="list" />
-                                    </button>
-                                    <button onClick={() => setViewMode('calendar')} className={`p-1.5 rounded-lg transition-all ${viewMode === 'calendar' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}>
-                                        <Icon name="layout-grid" />
-                                    </button>
+                                    <button onClick={() => setViewMode('list')} className={`p-1.5 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}><Icon name="list" /></button>
+                                    <button onClick={() => setViewMode('calendar')} className={`p-1.5 rounded-lg transition-all ${viewMode === 'calendar' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}><Icon name="layout-grid" /></button>
                                 </div>
                                 <button onClick={() => setIsModalOpen(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-bold shadow-md active:scale-95 transition-all">
                                     <Icon name="plus" /> {isAdmin ? "Add Event" : "Submit Event"}
@@ -329,11 +322,18 @@
                                                     </div>
                                                     <h3 className="text-xl font-bold text-slate-900">{event.title}</h3>
                                                     <p className="text-slate-600 text-sm mt-1 leading-relaxed">{event.description}</p>
+                                                    
                                                     <div className="flex flex-wrap gap-5 mt-5 text-sm font-semibold text-slate-500">
                                                         <div className="flex items-center gap-2 bg-slate-50 px-3 py-1 rounded-lg border border-slate-100"><Icon name="clock" size={14} className="text-indigo-500" />{event.time}</div>
                                                         <button onClick={() => setActiveTag(event.location)} className={`flex items-center gap-2 px-3 py-1 rounded-lg border transition-all ${activeTag === event.location ? 'bg-amber-100 border-amber-200 text-amber-700' : 'bg-slate-50 border-slate-100 hover:border-indigo-200 hover:text-indigo-600'}`}>
                                                             <Icon name="map-pin" size={14} className={activeTag === event.location ? 'text-amber-500' : 'text-indigo-500'} /> {event.location}
                                                         </button>
+                                                        {event.contact && (
+                                                            <div className="flex items-center gap-2 bg-slate-50 px-3 py-1 rounded-lg border border-slate-100">
+                                                                <Icon name="mail" size={14} className="text-indigo-500" />
+                                                                {event.contact}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                                 <div className="flex md:flex-col gap-3">
@@ -371,10 +371,10 @@
 
                     {isModalOpen && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-200">
-                            <div className="bg-white w-full max-w-lg rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in slide-in-from-bottom-8 duration-300">
-                                <div className="p-8 border-b border-slate-50 flex justify-between items-center bg-indigo-50/50">
+                            <div className="bg-white w-full max-w-lg rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in slide-in-from-bottom-8 duration-300 max-h-[90vh] overflow-y-auto">
+                                <div className="p-8 border-b border-slate-50 flex justify-between items-center bg-indigo-50/50 sticky top-0 z-20">
                                     <h3 className="text-2xl font-black text-indigo-950 tracking-tight">{isAdmin ? "Publish Event" : "Submit Event"}</h3>
-                                    <button onClick={() => setIsModalOpen(false)} className="bg-white p-2 rounded-full shadow-md text-slate-400 hover:text-indigo-600 transition-all"><Icon name="plus" className="rotate-45" size={24} /></button>
+                                    <button onClick={() => setIsModalOpen(false)} className="bg-white p-2 rounded-full shadow-md text-slate-400"><Icon name="plus" className="rotate-45" size={24} /></button>
                                 </div>
                                 <form onSubmit={handleAddEvent} className="p-8 space-y-5">
                                     {!isAdmin && (
@@ -407,6 +407,13 @@
                                             <select className="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none bg-white font-bold cursor-pointer hover:border-indigo-200 transition-colors appearance-none" value={newEvent.category} onChange={e => setNewEvent({...newEvent, category: e.target.value})}>
                                                 <option>General</option><option>Social</option><option>Culture</option><option>Environment</option><option>Meeting</option>
                                             </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Contact Details (Email or Phone)</label>
+                                            <div className="relative">
+                                                <Icon name="mail" className="absolute left-4 top-4 text-slate-300" size={18} />
+                                                <input type="text" placeholder="e.g. hello@example.com" className="w-full pl-12 pr-5 py-4 rounded-2xl border border-slate-200 focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 outline-none transition-all font-medium text-slate-600" value={newEvent.contact} onChange={e => setNewEvent({...newEvent, contact: e.target.value})} />
+                                            </div>
                                         </div>
                                         <div>
                                             <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Tell us more</label>
