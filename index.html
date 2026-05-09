@@ -128,7 +128,7 @@
             const isAdmin = user?.uid === ADMIN_UID;
 
             const [newEvent, setNewEvent] = useState({
-                title: '', date: '', endDate: '', time: '', location: '', description: '', tags: [], contact: '', isMultiDay: false, entryType: 'Free', entryFee: '', isOtherTagSelected: false, otherTag: ''
+                title: '', date: '', endDate: '', time: '', location: '', description: '', tags: [], contact: '', isMultiDay: false, isWeekly: false, entryType: 'Free', entryFee: '', isOtherTagSelected: false, otherTag: ''
             });
 
             useEffect(() => {
@@ -159,10 +159,43 @@
             }, [user, dbInstance]);
 
             const displayEvents = useMemo(() => {
-                let filtered = [...events];
+                let baseEvents = [...events];
                 if (!isAdmin) {
-                    filtered = filtered.filter(e => e.status === 'approved' || (user && e.createdBy === user.uid));
+                    baseEvents = baseEvents.filter(e => e.status === 'approved' || (user && e.createdBy === user.uid));
                 }
+
+                // Generate instances for weekly events
+                let allInstances = [];
+                baseEvents.forEach(event => {
+                    allInstances.push(event); // Always add the master instance
+                    
+                    if (event.isWeekly) {
+                        // Project 8 weeks forward
+                        for (let i = 1; i <= 8; i++) {
+                            const nextDate = new Date(event.date);
+                            nextDate.setDate(nextDate.getDate() + (i * 7));
+                            const dateStr = nextDate.toISOString().split('T')[0];
+                            
+                            // For multi-day weekly events, project the end date too
+                            let virtualEndDate = '';
+                            if (event.isMultiDay && event.endDate) {
+                                const nextEndDate = new Date(event.endDate);
+                                nextEndDate.setDate(nextEndDate.getDate() + (i * 7));
+                                virtualEndDate = nextEndDate.toISOString().split('T')[0];
+                            }
+
+                            allInstances.push({
+                                ...event,
+                                id: `${event.id}-virtual-${i}`,
+                                date: dateStr,
+                                endDate: virtualEndDate,
+                                isVirtual: true // Used to hide Admin buttons on clones
+                            });
+                        }
+                    }
+                });
+                
+                let filtered = allInstances;
                 if (activeTag) {
                     filtered = filtered.filter(e => 
                         e.location?.toLowerCase() === activeTag.toLowerCase() ||
@@ -200,7 +233,7 @@
                         createdBy: user.uid,
                         createdAt: new Date().toISOString()
                     });
-                    setNewEvent({ title: '', date: '', endDate: '', time: '', location: '', description: '', tags: [], contact: '', isMultiDay: false, entryType: 'Free', entryFee: '', isOtherTagSelected: false, otherTag: '' });
+                    setNewEvent({ title: '', date: '', endDate: '', time: '', location: '', description: '', tags: [], contact: '', isMultiDay: false, isWeekly: false, entryType: 'Free', entryFee: '', isOtherTagSelected: false, otherTag: '' });
                     setIsModalOpen(false);
                 } catch (error) { console.error(error); }
             };
@@ -323,7 +356,7 @@
                                     <button onClick={() => setViewMode('list')} className={`px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${viewMode === 'list' ? (isDarkMode ? 'bg-slate-700 text-sky-400' : 'bg-white shadow-sm text-sky-600') : 'text-slate-500 hover:text-slate-400'}`}><Icon name="layout-list" size={14} /></button>
                                     <button onClick={() => setViewMode('calendar')} className={`px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${viewMode === 'calendar' ? (isDarkMode ? 'bg-slate-700 text-sky-400' : 'bg-white shadow-sm text-sky-600') : 'text-slate-500 hover:text-slate-400'}`}><Icon name="calendar" size={14} /></button>
                                 </div>
-                                <button onClick={() => setIsModalOpen(true)} className="bg-slate-900 hover:bg-slate-800 text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl flex items-center gap-2 text-[10px] sm:text-sm font-bold shadow-xl active:scale-95 transition-all border border-transparent dark:border-slate-700">
+                                <button onClick={() => setIsModalOpen(true)} className="bg-slate-900 hover:bg-slate-800 text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl flex items-center gap-2 text-[10px] sm:text-sm font-bold shadow-xl active:scale-95 transition-all border border-transparent">
                                     <Icon name="plus" size={14} className="text-sky-400" />
                                     <span className="hidden xs:inline">{isAdmin ? "New" : "Submit"}</span>
                                 </button>
@@ -381,6 +414,7 @@
                                                                 <button key={t} onClick={() => setActiveTag(t)} className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full shadow-sm border tag-pill ${isDarkMode ? 'bg-slate-800 text-slate-400 border-slate-700 hover:text-sky-400' : 'bg-f1f5f9 text-slate-500 border-slate-100 hover:text-sky-600'}`}>{t}</button>
                                                             ))}
                                                             {event.status === 'pending' && <span className="text-[8px] font-black bg-amber-500 text-white px-2 py-0.5 rounded-full shadow-md">Reviewing</span>}
+                                                            {event.isWeekly && <span className={`text-[8px] font-black px-2 py-0.5 rounded-full border uppercase tracking-tighter ${isDarkMode ? 'bg-amber-900/30 text-amber-400 border-amber-800' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>Weekly Event</span>}
                                                             {durationText && <span className={`text-[8px] font-black px-2 py-0.5 rounded-full border uppercase tracking-tighter ${isDarkMode ? 'bg-indigo-900/30 text-indigo-400 border-indigo-800' : 'bg-indigo-50 text-indigo-600 border-indigo-100'}`}>{durationText}</span>}
                                                         </div>
                                                         <h3 className={`text-lg font-extrabold group-hover:text-sky-500 transition-colors truncate ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}>{event.title}</h3>
@@ -396,8 +430,9 @@
                                                                 <div className="relative"><Icon name="calendar" size={18} /><span className="absolute -top-1 -right-1 text-[10px] font-black text-sky-600 bg-white rounded-full leading-none">+</span></div>
                                                             </button>
                                                         )}
-                                                        {isAdmin && event.status === 'pending' && <button onClick={() => approveEvent(event.id)} className="w-10 h-10 bg-green-500 text-white rounded-xl flex items-center justify-center hover:bg-green-600 shadow-md transition-all active:scale-90"><Icon name="check" size={20} /></button>}
-                                                        {(isAdmin || (isMyOwn && event.status === 'pending')) && <button onClick={() => deleteEvent(event.id)} className={`w-10 h-10 border rounded-xl flex items-center justify-center transition-all shadow-sm active:scale-90 ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-500 hover:text-red-400' : 'bg-white border-slate-100 text-slate-300 hover:text-red-500'}`}><Icon name="trash-2" size={18} /></button>}
+                                                        {/* Only show Admin actions on the master instance, not virtual copies */}
+                                                        {isAdmin && event.status === 'pending' && !event.isVirtual && <button onClick={() => approveEvent(event.id)} className="w-10 h-10 bg-green-500 text-white rounded-xl flex items-center justify-center hover:bg-green-600 shadow-md transition-all active:scale-90"><Icon name="check" size={20} /></button>}
+                                                        {(isAdmin || (isMyOwn && event.status === 'pending')) && !event.isVirtual && <button onClick={() => deleteEvent(event.id)} className={`w-10 h-10 border rounded-xl flex items-center justify-center transition-all shadow-sm active:scale-90 ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-500 hover:text-red-400' : 'bg-white border-slate-100 text-slate-300 hover:text-red-500'}`}><Icon name="trash-2" size={18} /></button>}
                                                     </div>
                                                 </div>
                                             </div>
@@ -451,8 +486,24 @@
                                             </div>
                                         </div>
                                         <div className={`p-6 rounded-[2rem] border space-y-4 ${isDarkMode ? 'bg-[#121212] border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
-                                            <label className="flex items-center gap-3 cursor-pointer group"><input type="checkbox" className="hidden" checked={newEvent.isMultiDay} onChange={() => setNewEvent(p => ({...p, isMultiDay: !p.isMultiDay, endDate: !p.isMultiDay ? p.date : ''}))} /><div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${newEvent.isMultiDay ? 'bg-sky-600 border-sky-600' : 'border-slate-600'}`}>{newEvent.isMultiDay && <Icon name="check" size={14} className="text-white" />}</div><span className="text-sm font-bold">Multi-day event?</span></label>
+                                            <label className="flex items-center gap-3 cursor-pointer group">
+                                                <input type="checkbox" className="hidden" checked={newEvent.isMultiDay} onChange={() => setNewEvent(p => ({...p, isMultiDay: !p.isMultiDay, endDate: !p.isMultiDay ? p.date : ''}))} />
+                                                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${newEvent.isMultiDay ? 'bg-sky-600 border-sky-600' : 'border-slate-600'}`}>
+                                                    {newEvent.isMultiDay && <Icon name="check" size={14} className="text-white" />}
+                                                </div>
+                                                <span className="text-sm font-bold">Multi-day event?</span>
+                                            </label>
                                             {newEvent.isMultiDay && <div className="space-y-3 pt-2 animate-in slide-in-from-top-2 duration-200"><label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] ml-2">Finish Date</label><input required type="date" min={newEvent.date} className={`w-full px-8 py-5 rounded-3xl border outline-none font-bold ${isDarkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200'}`} value={newEvent.endDate} onChange={e => setNewEvent({...newEvent, endDate: e.target.value})} /></div>}
+                                            
+                                            <div className="h-px bg-slate-200 dark:bg-slate-800 my-2"></div>
+                                            
+                                            <label className="flex items-center gap-3 cursor-pointer group">
+                                                <input type="checkbox" className="hidden" checked={newEvent.isWeekly} onChange={() => setNewEvent(p => ({...p, isWeekly: !p.isWeekly}))} />
+                                                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${newEvent.isWeekly ? 'bg-amber-600 border-amber-600' : 'border-slate-600'}`}>
+                                                    {newEvent.isWeekly && <Icon name="check" size={14} className="text-white" />}
+                                                </div>
+                                                <span className="text-sm font-bold">Does this run every week?</span>
+                                            </label>
                                         </div>
                                         <div className="space-y-3">
                                             <label className={`text-[10px] font-black uppercase tracking-[0.2em] ml-2 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>Entry Details</label>
