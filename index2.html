@@ -436,7 +436,6 @@
                                                                 <div className="relative"><Icon name="calendar" size={18} /><span className="absolute -top-1 -right-1 text-[10px] font-black text-sky-600 bg-white rounded-full leading-none">+</span></div>
                                                             </button>
                                                         )}
-                                                        {/* Only show Admin actions on the master instance, not virtual copies */}
                                                         {isAdmin && event.status === 'pending' && !event.isVirtual && <button onClick={() => approveEvent(event.id)} className="w-10 h-10 bg-green-500 text-white rounded-xl flex items-center justify-center hover:bg-green-600 shadow-md transition-all active:scale-90"><Icon name="check" size={20} /></button>}
                                                         {(isAdmin || (isMyOwn && event.status === 'pending')) && !event.isVirtual && <button onClick={() => deleteEvent(event.id)} className={`w-10 h-10 border rounded-xl flex items-center justify-center transition-all shadow-sm active:scale-90 ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-500 hover:text-red-400' : 'bg-white border-slate-100 text-slate-300 hover:text-red-500'}`}><Icon name="trash-2" size={18} /></button>}
                                                     </div>
@@ -444,7 +443,7 @@
                                             </div>
                                         );
 
-                                        // INTEGRATED SPONSOR SLOT: Entire card is a link with subtle blue glow
+                                        // RE-STYLED SPONSOR SLOT: Yellow/Orange Palette with seamless layout
                                         if ((index + 1) % 10 === 0) {
                                             items.push(
                                                 <a 
@@ -452,21 +451,21 @@
                                                     target="_blank" 
                                                     rel="noopener noreferrer"
                                                     key={`ad-${index}`} 
-                                                    className={`event-card block p-4 sm:p-5 rounded-3xl border-2 border-dashed relative overflow-hidden group transition-all duration-500 ${isDarkMode ? 'bg-slate-900/30 border-sky-900/30 hover:border-sky-500/50 shadow-[0_0_20px_-5px_rgba(14,165,233,0.15)]' : 'bg-white border-sky-100 hover:border-sky-300 shadow-[0_0_20px_-5px_rgba(2,132,199,0.1)]'}`}
+                                                    className={`event-card block p-4 sm:p-5 rounded-3xl border-2 border-dashed relative overflow-hidden group transition-all duration-500 ${isDarkMode ? 'bg-orange-950/10 border-orange-500/40 hover:bg-orange-900/20 hover:border-orange-400 shadow-[0_0_20px_-5px_rgba(249,115,22,0.15)]' : 'bg-orange-50 border-orange-400/60 hover:bg-orange-100/50 hover:border-orange-500 shadow-[0_0_20px_-5px_rgba(249,115,22,0.1)]'}`}
                                                 >
                                                     <div className="flex items-center gap-4 sm:gap-5">
-                                                        <div className={`flex-shrink-0 flex flex-col items-center justify-center w-14 h-16 rounded-2xl transition-all duration-300 ${isDarkMode ? 'bg-slate-800 text-sky-400 shadow-[0_0_10px_rgba(14,165,233,0.1)]' : 'bg-sky-50 text-sky-600 shadow-[0_0_10px_rgba(2,132,199,0.1)]'}`}>
+                                                        <div className={`flex-shrink-0 flex flex-col items-center justify-center w-14 h-16 rounded-2xl transition-all duration-300 ${isDarkMode ? 'bg-orange-900/40 text-orange-400' : 'bg-orange-100 text-orange-600'}`}>
                                                             <Icon name="megaphone" size={24} />
                                                         </div>
                                                         <div className="flex-grow min-w-0">
                                                             <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                                                <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border ${isDarkMode ? 'bg-sky-900/30 text-sky-400 border-sky-800' : 'bg-sky-100 text-sky-700 border-sky-200'}`}>Featured Spot</span>
+                                                                <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border ${isDarkMode ? 'bg-orange-900/30 text-orange-300 border-orange-800/50' : 'bg-white text-orange-700 border-orange-200'}`}>Featured Spot</span>
                                                             </div>
-                                                            <h3 className={`text-lg font-extrabold truncate ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}>Promote Your Event</h3>
-                                                            <p className={`text-[10px] font-medium leading-relaxed truncate ${isDarkMode ? 'text-slate-500' : 'text-slate-500'}`}>Click here to reach the local Pembrokeshire community.</p>
+                                                            <h3 className={`text-lg font-extrabold truncate ${isDarkMode ? 'text-orange-100' : 'text-orange-900'}`}>Promote Your Event</h3>
+                                                            <p className={`text-[10px] font-medium leading-relaxed truncate ${isDarkMode ? 'text-orange-400/60' : 'text-orange-600/70'}`}>Click here to reach the local Pembrokeshire community.</p>
                                                         </div>
                                                         <div className="shrink-0 flex items-center justify-center w-10 h-10">
-                                                            <Icon name="external-link" size={16} className={isDarkMode ? 'text-slate-700 group-hover:text-sky-500' : 'text-slate-200 group-hover:text-sky-400'} />
+                                                            <Icon name="external-link" size={16} className={isDarkMode ? 'text-orange-800 group-hover:text-orange-400' : 'text-orange-300 group-hover:text-orange-600'} />
                                                         </div>
                                                     </div>
                                                 </a>
@@ -545,8 +544,8 @@
                                         <div className="space-y-3">
                                             <label className={`text-[10px] font-black uppercase tracking-[0.2em] ml-2 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>Entry Details</label>
                                             <div className={`grid grid-cols-2 gap-4 p-1 rounded-3xl border ${isDarkMode ? 'bg-[#121212] border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
-                                                <button type="button" onClick={() => setNewEvent({...newEvent, entryType: 'Free', entryFee: ''})} className={`py-3 px-6 rounded-2xl text-sm font-bold transition-all ${newEvent.entryType === 'Free' ? (isDarkMode ? 'bg-slate-800 text-sky-400 shadow-md' : 'bg-white shadow-md text-sky-600') : 'text-slate-500'}`}>Free</button>
-                                                <button type="button" onClick={() => setNewEvent({...newEvent, entryType: 'Paid'})} className={`py-3 px-6 rounded-2xl text-sm font-bold transition-all ${newEvent.entryType === 'Paid' ? (isDarkMode ? 'bg-slate-800 text-sky-400 shadow-md' : 'bg-white shadow-md text-sky-600') : 'text-slate-500'}`}>Paid</button>
+                                                <button type="button" onClick={() => setNewEvent({...newEvent, entryType: 'Free', entryFee: ''})} className={`py-3 px-6 rounded-2xl text-sm font-bold transition-all ${newEvent.entryType === 'Free' ? (isDarkMode ? 'bg-slate-800 text-sky-400 shadow-md' : 'bg-white shadow-md text-sky-600') : 'text-slate-50'}`}>Free</button>
+                                                <button type="button" onClick={() => setNewEvent({...newEvent, entryType: 'Paid'})} className={`py-3 px-6 rounded-2xl text-sm font-bold transition-all ${newEvent.entryType === 'Paid' ? (isDarkMode ? 'bg-slate-800 text-sky-400 shadow-md' : 'bg-white shadow-md text-sky-600') : 'text-slate-50'}`}>Paid</button>
                                             </div>
                                             {newEvent.entryType === 'Paid' && <div className="relative pt-2 animate-in slide-in-from-top-2 duration-200"><span className="absolute left-6 top-1/2 -translate-y-1/2 font-bold text-slate-400">£</span><input required type="text" placeholder="5.00" className={`w-full pl-10 pr-8 py-5 rounded-3xl border outline-none font-bold ${isDarkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200'}`} value={newEvent.entryFee} onChange={e => setNewEvent({...newEvent, entryFee: e.target.value.replace(/[^0-9.]/g, '')})} /></div>}
                                         </div>
