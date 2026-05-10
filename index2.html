@@ -4,12 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pembrokeshire Events</title>
+    <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React and Babel to run JSX in the browser -->
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
     
+    <!-- EXTERNAL CONFIGURATION -->
     <script src="config.js"></script>
 
     <style>
@@ -397,7 +401,6 @@
                                         const isMyOwn = user && event.createdBy === user.uid;
                                         const durationText = calculateDuration(event.date, event.endDate);
                                         
-                                        // Array to hold current card and possible ad card
                                         const items = [];
                                         
                                         // Standard Event Card
@@ -440,20 +443,27 @@
                                             </div>
                                         );
 
-                                        // AD SLOT: Triggered every 10 items
+                                        // SEAMLESS SPONSOR SLOT: Triggered every 10 items
                                         if ((index + 1) % 10 === 0) {
                                             items.push(
-                                                <div key={`ad-${index}`} className={`p-4 sm:p-5 rounded-3xl border-2 border-dashed flex flex-col items-center justify-center text-center gap-3 transition-all ${isDarkMode ? 'bg-slate-900/40 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
-                                                    <div className="bg-sky-500/10 p-3 rounded-full">
-                                                        <Icon name="megaphone" size={24} className="text-sky-500" />
+                                                <div key={`ad-${index}`} className={`event-card p-4 sm:p-5 rounded-3xl border-2 border-dashed relative overflow-hidden group ${isDarkMode ? 'bg-slate-900/20 border-slate-800' : 'bg-white border-slate-200/60'}`}>
+                                                    <div className="flex items-center gap-4 sm:gap-5">
+                                                        <div className={`flex-shrink-0 flex flex-col items-center justify-center w-14 h-16 rounded-2xl border-2 border-dashed transition-all duration-300 ${isDarkMode ? 'border-slate-700 text-slate-600' : 'border-slate-100 text-slate-300'}`}>
+                                                            <span className="text-[10px] font-black uppercase tracking-widest leading-none">ADS</span>
+                                                        </div>
+                                                        <div className="flex-grow min-w-0">
+                                                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                                                <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border ${isDarkMode ? 'bg-sky-900/30 text-sky-400 border-sky-800' : 'bg-sky-50 text-sky-700 border-sky-200'}`}>Featured Spot</span>
+                                                            </div>
+                                                            <h3 className={`text-lg font-extrabold truncate ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}>Promote Your Event</h3>
+                                                            <p className={`text-[10px] font-medium leading-relaxed truncate ${isDarkMode ? 'text-slate-500' : 'text-slate-500'}`}>Reach the local Pembrokeshire community.</p>
+                                                        </div>
+                                                        <div className="shrink-0">
+                                                            <button onClick={() => setIsModalOpen(true)} className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all active:scale-95 shadow-lg shadow-sky-500/20">
+                                                                Join
+                                                            </button>
+                                                        </div>
                                                     </div>
-                                                    <div>
-                                                        <h4 className={`text-sm font-black uppercase tracking-widest ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>Promote Your Event</h4>
-                                                        <p className={`text-[10px] font-medium mt-1 ${isDarkMode ? 'text-slate-500' : 'text-slate-500'}`}>Reach thousands of locals in Pembrokeshire.</p>
-                                                    </div>
-                                                    <button onClick={() => setIsModalOpen(true)} className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all active:scale-95 shadow-lg shadow-sky-500/20">
-                                                        Get Started
-                                                    </button>
                                                 </div>
                                             );
                                         }
@@ -508,7 +518,13 @@
                                             </div>
                                         </div>
                                         <div className={`p-6 rounded-[2rem] border space-y-4 ${isDarkMode ? 'bg-[#121212] border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
-                                            <label className="flex items-center gap-3 cursor-pointer group"><input type="checkbox" className="hidden" checked={newEvent.isMultiDay} onChange={() => setNewEvent(p => ({...p, isMultiDay: !p.isMultiDay, endDate: !p.isMultiDay ? p.date : ''}))} /><div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${newEvent.isMultiDay ? 'bg-sky-600 border-sky-600' : 'border-slate-600'}`}>{newEvent.isMultiDay && <Icon name="check" size={14} className="text-white" />}</div><span className="text-sm font-bold">Multi-day event?</span></label>
+                                            <label className="flex items-center gap-3 cursor-pointer group">
+                                                <input type="checkbox" className="hidden" checked={newEvent.isMultiDay} onChange={() => setNewEvent(p => ({...p, isMultiDay: !p.isMultiDay, endDate: !p.isMultiDay ? p.date : ''}))} />
+                                                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${newEvent.isMultiDay ? 'bg-sky-600 border-sky-600' : 'border-slate-600'}`}>
+                                                    {newEvent.isMultiDay && <Icon name="check" size={14} className="text-white" />}
+                                                </div>
+                                                <span className="text-sm font-bold">Multi-day event?</span>
+                                            </label>
                                             {newEvent.isMultiDay && <div className="space-y-3 pt-2 animate-in slide-in-from-top-2 duration-200"><label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] ml-2">Finish Date</label><input required type="date" min={newEvent.date} className={`w-full px-8 py-5 rounded-3xl border outline-none font-bold ${isDarkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200'}`} value={newEvent.endDate} onChange={e => setNewEvent({...newEvent, endDate: e.target.value})} /></div>}
                                             <div className="h-px bg-slate-200 dark:bg-slate-800 my-2"></div>
                                             <label className="flex items-center gap-3 cursor-pointer group"><input type="checkbox" className="hidden" checked={newEvent.isWeekly} onChange={() => setNewEvent(p => ({...p, isWeekly: !p.isWeekly}))} /><div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${newEvent.isWeekly ? 'bg-amber-600 border-amber-600' : 'border-slate-600'}`}>{newEvent.isWeekly && <Icon name="check" size={14} className="text-white" />}</div><span className="text-sm font-bold">Does this run every week?</span></label>
