@@ -444,7 +444,7 @@
                                             </div>
                                         );
 
-                                        // INTEGRATED SPONSOR SLOT: Entire card is a link, megaphone icon on left
+                                        // INTEGRATED SPONSOR SLOT: Entire card is a link with subtle blue glow
                                         if ((index + 1) % 10 === 0) {
                                             items.push(
                                                 <a 
@@ -452,10 +452,10 @@
                                                     target="_blank" 
                                                     rel="noopener noreferrer"
                                                     key={`ad-${index}`} 
-                                                    className={`event-card block p-4 sm:p-5 rounded-3xl border-2 border-dashed relative overflow-hidden group ${isDarkMode ? 'bg-slate-900/20 border-slate-800 hover:border-sky-900/50' : 'bg-white border-slate-200/60 hover:border-sky-200'}`}
+                                                    className={`event-card block p-4 sm:p-5 rounded-3xl border-2 border-dashed relative overflow-hidden group transition-all duration-500 ${isDarkMode ? 'bg-slate-900/30 border-sky-900/30 hover:border-sky-500/50 shadow-[0_0_20px_-5px_rgba(14,165,233,0.15)]' : 'bg-white border-sky-100 hover:border-sky-300 shadow-[0_0_20px_-5px_rgba(2,132,199,0.1)]'}`}
                                                 >
                                                     <div className="flex items-center gap-4 sm:gap-5">
-                                                        <div className={`flex-shrink-0 flex flex-col items-center justify-center w-14 h-16 rounded-2xl transition-all duration-300 ${isDarkMode ? 'bg-slate-800 text-sky-400' : 'bg-sky-50 text-sky-600'}`}>
+                                                        <div className={`flex-shrink-0 flex flex-col items-center justify-center w-14 h-16 rounded-2xl transition-all duration-300 ${isDarkMode ? 'bg-slate-800 text-sky-400 shadow-[0_0_10px_rgba(14,165,233,0.1)]' : 'bg-sky-50 text-sky-600 shadow-[0_0_10px_rgba(2,132,199,0.1)]'}`}>
                                                             <Icon name="megaphone" size={24} />
                                                         </div>
                                                         <div className="flex-grow min-w-0">
@@ -466,7 +466,7 @@
                                                             <p className={`text-[10px] font-medium leading-relaxed truncate ${isDarkMode ? 'text-slate-500' : 'text-slate-500'}`}>Click here to reach the local Pembrokeshire community.</p>
                                                         </div>
                                                         <div className="shrink-0 flex items-center justify-center w-10 h-10">
-                                                            <Icon name="external-link" size={16} className={isDarkMode ? 'text-slate-700' : 'text-slate-200'} />
+                                                            <Icon name="external-link" size={16} className={isDarkMode ? 'text-slate-700 group-hover:text-sky-500' : 'text-slate-200 group-hover:text-sky-400'} />
                                                         </div>
                                                     </div>
                                                 </a>
@@ -531,8 +531,16 @@
                                                 <span className="text-sm font-bold">Multi-day event?</span>
                                             </label>
                                             {newEvent.isMultiDay && <div className="space-y-3 pt-2 animate-in slide-in-from-top-2 duration-200"><label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] ml-2">Finish Date</label><input required type="date" min={newEvent.date} className={`w-full px-8 py-5 rounded-3xl border outline-none font-bold ${isDarkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200'}`} value={newEvent.endDate} onChange={e => setNewEvent({...newEvent, endDate: e.target.value})} /></div>}
+                                            
                                             <div className="h-px bg-slate-200 dark:bg-slate-800 my-2"></div>
-                                            <label className="flex items-center gap-3 cursor-pointer group"><input type="checkbox" className="hidden" checked={newEvent.isWeekly} onChange={() => setNewEvent(p => ({...p, isWeekly: !p.isWeekly}))} /><div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${newEvent.isWeekly ? 'bg-amber-600 border-amber-600' : 'border-slate-600'}`}>{newEvent.isWeekly && <Icon name="check" size={14} className="text-white" />}</div><span className="text-sm font-bold">Does this run every week?</span></label>
+                                            
+                                            <label className="flex items-center gap-3 cursor-pointer group">
+                                                <input type="checkbox" className="hidden" checked={newEvent.isWeekly} onChange={() => setNewEvent(p => ({...p, isWeekly: !p.isWeekly}))} />
+                                                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${newEvent.isWeekly ? 'bg-amber-600 border-amber-600' : 'border-slate-600'}`}>
+                                                    {newEvent.isWeekly && <Icon name="check" size={14} className="text-white" />}
+                                                </div>
+                                                <span className="text-sm font-bold">Does this run every week?</span>
+                                            </label>
                                         </div>
                                         <div className="space-y-3">
                                             <label className={`text-[10px] font-black uppercase tracking-[0.2em] ml-2 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>Entry Details</label>
