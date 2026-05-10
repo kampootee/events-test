@@ -436,6 +436,7 @@
                                                                 <div className="relative"><Icon name="calendar" size={18} /><span className="absolute -top-1 -right-1 text-[10px] font-black text-sky-600 bg-white rounded-full leading-none">+</span></div>
                                                             </button>
                                                         )}
+                                                        {/* Only show Admin actions on the master instance, not virtual copies */}
                                                         {isAdmin && event.status === 'pending' && !event.isVirtual && <button onClick={() => approveEvent(event.id)} className="w-10 h-10 bg-green-500 text-white rounded-xl flex items-center justify-center hover:bg-green-600 shadow-md transition-all active:scale-90"><Icon name="check" size={20} /></button>}
                                                         {(isAdmin || (isMyOwn && event.status === 'pending')) && !event.isVirtual && <button onClick={() => deleteEvent(event.id)} className={`w-10 h-10 border rounded-xl flex items-center justify-center transition-all shadow-sm active:scale-90 ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-500 hover:text-red-400' : 'bg-white border-slate-100 text-slate-300 hover:text-red-500'}`}><Icon name="trash-2" size={18} /></button>}
                                                     </div>
@@ -443,28 +444,32 @@
                                             </div>
                                         );
 
-                                        // SEAMLESS SPONSOR SLOT: Triggered every 10 items
+                                        // INTEGRATED SPONSOR SLOT: Entire card is a link, megaphone icon on left
                                         if ((index + 1) % 10 === 0) {
                                             items.push(
-                                                <div key={`ad-${index}`} className={`event-card p-4 sm:p-5 rounded-3xl border-2 border-dashed relative overflow-hidden group ${isDarkMode ? 'bg-slate-900/20 border-slate-800' : 'bg-white border-slate-200/60'}`}>
+                                                <a 
+                                                    href="https://example.com/advertise" 
+                                                    target="_blank" 
+                                                    rel="noopener noreferrer"
+                                                    key={`ad-${index}`} 
+                                                    className={`event-card block p-4 sm:p-5 rounded-3xl border-2 border-dashed relative overflow-hidden group ${isDarkMode ? 'bg-slate-900/20 border-slate-800 hover:border-sky-900/50' : 'bg-white border-slate-200/60 hover:border-sky-200'}`}
+                                                >
                                                     <div className="flex items-center gap-4 sm:gap-5">
-                                                        <div className={`flex-shrink-0 flex flex-col items-center justify-center w-14 h-16 rounded-2xl border-2 border-dashed transition-all duration-300 ${isDarkMode ? 'border-slate-700 text-slate-600' : 'border-slate-100 text-slate-300'}`}>
-                                                            <span className="text-[10px] font-black uppercase tracking-widest leading-none">ADS</span>
+                                                        <div className={`flex-shrink-0 flex flex-col items-center justify-center w-14 h-16 rounded-2xl transition-all duration-300 ${isDarkMode ? 'bg-slate-800 text-sky-400' : 'bg-sky-50 text-sky-600'}`}>
+                                                            <Icon name="megaphone" size={24} />
                                                         </div>
                                                         <div className="flex-grow min-w-0">
                                                             <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                                                <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border ${isDarkMode ? 'bg-sky-900/30 text-sky-400 border-sky-800' : 'bg-sky-50 text-sky-700 border-sky-200'}`}>Featured Spot</span>
+                                                                <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border ${isDarkMode ? 'bg-sky-900/30 text-sky-400 border-sky-800' : 'bg-sky-100 text-sky-700 border-sky-200'}`}>Featured Spot</span>
                                                             </div>
                                                             <h3 className={`text-lg font-extrabold truncate ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}>Promote Your Event</h3>
-                                                            <p className={`text-[10px] font-medium leading-relaxed truncate ${isDarkMode ? 'text-slate-500' : 'text-slate-500'}`}>Reach the local Pembrokeshire community.</p>
+                                                            <p className={`text-[10px] font-medium leading-relaxed truncate ${isDarkMode ? 'text-slate-500' : 'text-slate-500'}`}>Click here to reach the local Pembrokeshire community.</p>
                                                         </div>
-                                                        <div className="shrink-0">
-                                                            <button onClick={() => setIsModalOpen(true)} className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all active:scale-95 shadow-lg shadow-sky-500/20">
-                                                                Join
-                                                            </button>
+                                                        <div className="shrink-0 flex items-center justify-center w-10 h-10">
+                                                            <Icon name="external-link" size={16} className={isDarkMode ? 'text-slate-700' : 'text-slate-200'} />
                                                         </div>
                                                     </div>
-                                                </div>
+                                                </a>
                                             );
                                         }
 
