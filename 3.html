@@ -1,0 +1,413 @@
+import React, { useState, useMemo, useEffect } from 'react';
+import { 
+  Calendar, 
+  Plus, 
+  MapPin, 
+  Clock, 
+  List, 
+  LayoutGrid, 
+  ChevronLeft, 
+  ChevronRight, 
+  Trash2, 
+  CalendarDays, 
+  Loader2, 
+  X, 
+  Tag, 
+  CheckCircle, 
+  AlertCircle, 
+  ShieldCheck,
+  Copy,
+  Info,
+  ThumbsUp,
+  ExternalLink,
+  CheckCircle2
+} from 'lucide-react';
+
+// Firebase Imports
+import { initializeApp } from 'firebase/app';
+import { 
+  getAuth, 
+  signInWithCustomToken, 
+  signInAnonymously, 
+  onAuthStateChanged 
+} from 'firebase/auth';
+import { 
+  getFirestore, 
+  collection, 
+  addDoc, 
+  deleteDoc, 
+  doc, 
+  onSnapshot, 
+  query, 
+  updateDoc,
+  increment
+} from 'firebase/firestore';
+
+// Initialize Firebase
+const firebaseConfig = JSON.parse(__firebase_config);
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'community-calendar-app';
+
+const ADMIN_UID = "FMv14irUYzes4glPHCNV8BexIqK2"; 
+
+const PRIORITY_HUBS = ["Tenby", "Haverfordwest", "Pembroke", "Milford Haven"];
+const TOWNS = [
+  ...PRIORITY_HUBS,
+  "St Davids", "Narberth", "Saundersfoot", "Fishguard", "Neyland", "Newport", 
+  "Solva", "Broad Haven", "Little Haven", "Dale", "Manorbier", "Carew", 
+  "Amroth", "Kilgetty", "Crymych", "Letterston", "Johnston"
+];
+
+const App = () => {
+  const [user, setUser] = useState(null);
+  const [events, setEvents] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [viewMode, setViewMode] = useState('list');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isTownModalOpen, setIsTownModalOpen] = useState(false);
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [activeTag, setActiveTag] = useState(null);
+  const [copyFeedback, setCopyFeedback] = useState(false);
+  
+  // Local storage for user's own interest states (0=None, 1=Interested, 2=Going)
+  const [myInterests, setMyInterests] = useState(() => {
+    const saved = localStorage.getItem(`${appId}-my-interests`);
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  const isAdmin = user?.uid === ADMIN_UID;
+
+  const [newEvent, setNewEvent] = useState({
+    title: '',
+    date: '',
+    time: '',
+    location: '',
+    description: '',
+    category: 'General',
+    link: '',
+    isSuggestingLocation: false,
+    suggestedLocation: ''
+  });
+
+  useEffect(() => {
+    localStorage.setItem(`${appId}-my-interests`, JSON.stringify(myInterests));
+  }, [myInterests]);
+
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+      } catch (error) {
+        console.error("Auth error:", error);
+      }
+    };
+    initAuth();
+    const unsubscribe = onAuthStateChanged(auth, (user) => setUser(user));
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    const eventsCollection = collection(db, 'artifacts', appId, 'public', 'data', 'events');
+    const unsubscribe = onSnapshot(query(eventsCollection), (snapshot) => {
+      setEvents(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setIsLoading(false);
+    }, (err) => {
+      setIsLoading(false);
+    });
+    return () => unsubscribe();
+  }, [user]);
+
+  const displayEvents = useMemo(() => {
+    let filtered = [...events];
+    if (!isAdmin) filtered = filtered.filter(e => e.status === 'approved' || e.createdBy === user?.uid);
+    if (activeTag) filtered = filtered.filter(e => e.location?.toLowerCase().includes(activeTag.toLowerCase()));
+    return filtered.sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
+  }, [events, activeTag, isAdmin, user]);
+
+  const handleAddEvent = async (e) => {
+    e.preventDefault();
+    if (!newEvent.title || !newEvent.date || !user) return;
+    
+    try {
+      const finalLocation = newEvent.isSuggestingLocation 
+        ? `[SUGGEST] ${newEvent.suggestedLocation}` 
+        : newEvent.location;
+
+      const eventsCollection = collection(db, 'artifacts', appId, 'public', 'data', 'events');
+      await addDoc(eventsCollection, {
+        ...newEvent,
+        location: finalLocation,
+        status: isAdmin ? 'approved' : 'pending',
+        createdBy: user.uid,
+        createdAt: new Date().toISOString(),
+        interestedCount: 0,
+        goingCount: 0
+      });
+
+      setNewEvent({ title: '', date: '', time: '', location: '', description: '', category: 'General', link: '', isSuggestingLocation: false, suggestedLocation: '' });
+      setIsModalOpen(false);
+    } catch (error) { console.error(error); }
+  };
+
+  const toggleInterest = async (eventId) => {
+    const currentStatus = myInterests[eventId] || 0;
+    const nextStatus = (currentStatus + 1) % 3; // 0 -> 1 -> 2 -> 0
+    
+    const eventDoc = doc(db, 'artifacts', appId, 'public', 'data', 'events', eventId);
+    
+    // Calculate updates for Firestore
+    const updates = {};
+    if (currentStatus === 1) updates.interestedCount = increment(-1);
+    if (currentStatus === 2) updates.goingCount = increment(-1);
+    if (nextStatus === 1) updates.interestedCount = increment(1);
+    if (nextStatus === 2) updates.goingCount = increment(1);
+
+    try {
+      await updateDoc(eventDoc, updates);
+      setMyInterests(prev => ({ ...prev, [eventId]: nextStatus }));
+    } catch (error) { console.error(error); }
+  };
+
+  const approveEvent = async (id) => {
+    const eventDoc = doc(db, 'artifacts', appId, 'public', 'data', 'events', id);
+    await updateDoc(eventDoc, { status: 'approved' });
+  };
+
+  const deleteEvent = async (id) => {
+    const eventDoc = doc(db, 'artifacts', appId, 'public', 'data', 'events', id);
+    await deleteDoc(eventDoc);
+  };
+
+  const copyUID = () => {
+    const el = document.createElement('textarea');
+    el.value = user.uid;
+    document.body.appendChild(el);
+    el.select();
+    document.execCommand('copy');
+    document.body.removeChild(el);
+    setCopyFeedback(true);
+    setTimeout(() => setCopyFeedback(false), 2000);
+  };
+
+  const renderCalendar = () => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const days = [];
+    for (let i = 0; i < new Date(year, month, 1).getDay(); i++) days.push(<div key={`empty-${i}`} className="h-24 border border-slate-100 bg-slate-50/50"></div>);
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const dayEvents = displayEvents.filter(e => e.date === dateStr);
+      days.push(
+        <div key={d} className="h-24 border border-slate-100 p-1 overflow-hidden hover:bg-indigo-50">
+          <span className="text-xs font-semibold text-slate-400">{d}</span>
+          <div className="mt-1 space-y-1">
+            {dayEvents.map(e => <div key={e.id} className="text-[10px] truncate px-1 rounded bg-indigo-600 text-white">{e.time} {e.title}</div>)}
+          </div>
+        </div>
+      );
+    }
+    return days;
+  };
+
+  if (isLoading) return <div className="min-h-screen flex items-center justify-center bg-slate-50"><Loader2 className="animate-spin text-indigo-600" /></div>;
+
+  return (
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
+      <nav className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+        <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-2 cursor-pointer" onClick={() => setActiveTag(null)}>
+            <div className="bg-indigo-600 p-2 rounded-lg shadow-indigo-200 shadow-lg"><CalendarDays className="text-white w-5 h-5" /></div>
+            <h1 className="text-xl font-bold text-slate-800 tracking-tight">Pembs Events</h1>
+          </div>
+          <div className="flex items-center gap-4">
+             <div className="hidden sm:flex bg-slate-100 p-1 rounded-lg">
+              <button onClick={() => setViewMode('list')} className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}><List size={18} /></button>
+              <button onClick={() => setViewMode('calendar')} className={`p-1.5 rounded-md transition-all ${viewMode === 'calendar' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}><LayoutGrid size={18} /></button>
+            </div>
+            <button onClick={() => setIsModalOpen(true)} className="bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-semibold shadow-md active:scale-95 transition-all"><Plus size={18} /> Submit</button>
+          </div>
+        </div>
+      </nav>
+
+      <main className="max-w-5xl mx-auto px-4 py-6">
+        <div className="mb-6 flex flex-wrap gap-2 items-center bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
+          <span className="text-[10px] font-black uppercase text-slate-400 ml-2">Hubs:</span>
+          {PRIORITY_HUBS.map(hub => (
+            <button key={hub} onClick={() => setActiveTag(hub)} className={`px-4 py-1.5 rounded-full text-[10px] font-bold transition-all ${activeTag === hub ? 'bg-indigo-600 text-white shadow-lg' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>{hub}</button>
+          ))}
+          <button onClick={() => setIsTownModalOpen(true)} className="px-4 py-1.5 rounded-full text-[10px] font-bold border-2 border-dashed border-slate-200 text-indigo-600">More...</button>
+        </div>
+
+        {viewMode === 'list' ? (
+          <div className="grid gap-4">
+            {displayEvents.length > 0 ? (
+              displayEvents.map(event => {
+                const myStatus = myInterests[event.id] || 0;
+                return (
+                  <div key={event.id} className={`bg-white rounded-2xl border border-slate-200 transition-all group overflow-hidden ${event.status === 'pending' ? 'border-amber-200 bg-amber-50/20' : 'hover:shadow-md'}`}>
+                    <div className="flex flex-col md:flex-row md:items-center">
+                      {/* Clickable Card Body */}
+                      <div 
+                        onClick={() => event.link && window.open(event.link, '_blank')}
+                        className={`flex-grow p-5 flex items-center gap-5 ${event.link ? 'cursor-pointer hover:bg-slate-50/50' : ''}`}
+                      >
+                        <div className="flex-shrink-0 w-16 h-16 rounded-2xl flex flex-col items-center justify-center bg-indigo-50 text-indigo-600 border border-indigo-100">
+                          <span className="text-xs font-bold uppercase">{new Date(event.date).toLocaleDateString('en-US', { month: 'short' })}</span>
+                          <span className="text-2xl font-black leading-none mt-1">{new Date(event.date).getDate()}</span>
+                        </div>
+                        <div className="flex-grow min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            {event.entryType === 'Paid' && <span className="text-[9px] font-bold bg-orange-500 text-white px-2 py-0.5 rounded-full">Entry: £{event.entryFee}</span>}
+                            {event.status === 'pending' && <span className="text-[9px] font-bold bg-amber-500 text-white px-2 py-0.5 rounded-full">REVIEWING</span>}
+                            {event.link && <ExternalLink size={12} className="text-indigo-300" />}
+                          </div>
+                          <h3 className="text-lg font-bold text-slate-900 truncate">{event.title}</h3>
+                          <div className="flex flex-wrap gap-4 mt-2 text-xs font-medium text-slate-500">
+                            <div className="flex items-center gap-1.5"><Clock size={14} className="text-indigo-400" />{event.time}</div>
+                            <div className="flex items-center gap-1.5"><MapPin size={14} className="text-indigo-400" />{event.location.replace('[SUGGEST] ', '')}</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Interaction & Admin Row */}
+                      <div className="p-4 md:p-5 flex items-center justify-between border-t md:border-t-0 md:border-l border-slate-100 gap-4 shrink-0">
+                        <div className="flex items-center gap-3">
+                          <button 
+                            onClick={() => toggleInterest(event.id)}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm ${
+                              myStatus === 1 ? 'bg-indigo-600 text-white' : 
+                              myStatus === 2 ? 'bg-green-600 text-white' : 
+                              'bg-slate-50 text-slate-400 hover:bg-slate-100'
+                            }`}
+                          >
+                            {myStatus === 2 ? <CheckCircle2 size={16}/> : <ThumbsUp size={16}/>}
+                            <span>{myStatus === 1 ? 'Interested' : myStatus === 2 ? 'Going' : 'Count me in'}</span>
+                          </button>
+                          
+                          <div className="flex flex-col items-start min-w-[60px]">
+                            {event.interestedCount > 0 && <span className="text-[10px] font-bold text-indigo-500">{event.interestedCount} interested</span>}
+                            {event.goingCount > 0 && <span className="text-[10px] font-bold text-green-500">{event.goingCount} going</span>}
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2">
+                           {isAdmin && event.status === 'pending' && <button onClick={() => approveEvent(event.id)} className="bg-green-600 text-white p-2 rounded-xl shadow-lg shadow-green-100"><CheckCircle size={18}/></button>}
+                           {(isAdmin || event.createdBy === user?.uid) && <button onClick={() => deleteEvent(event.id)} className="bg-white border border-red-100 text-red-500 p-2 rounded-xl hover:bg-red-500 hover:text-white transition-all"><Trash2 size={18}/></button>}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            ) : <div className="text-center py-20 bg-white rounded-3xl border-2 border-dashed border-slate-200 opacity-50"><Calendar size={48} className="mx-auto mb-4" /><h3>No events found</h3></div>}
+          </div>
+        ) : (
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-6 flex items-center justify-between border-b border-slate-100">
+              <h2 className="text-xl font-bold">{currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</h2>
+              <div className="flex gap-2">
+                <button onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() - 1)))} className="p-2 hover:bg-slate-100 rounded-xl"><ChevronLeft size={20} /></button>
+                <button onClick={() => setCurrentDate(new Date())} className="px-4 py-1 text-sm font-bold hover:bg-slate-100 rounded-xl">Today</button>
+                <button onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() + 1)))} className="p-2 hover:bg-slate-100 rounded-xl"><ChevronRight size={20} /></button>
+              </div>
+            </div>
+            <div className="grid grid-cols-7">{['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => <div key={day} className="py-3 text-center text-[10px] font-black text-slate-400 uppercase">{day}</div>)}</div>
+            <div className="grid grid-cols-7">{renderCalendar()}</div>
+          </div>
+        )}
+      </main>
+
+      {/* MODAL: SUBMISSION */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-indigo-50/30">
+              <h3 className="text-xl font-bold text-indigo-900">Share your event</h3>
+              <button onClick={() => setIsModalOpen(false)} className="bg-white p-2 rounded-full shadow-sm text-slate-400 hover:text-red-500 transition-colors"><X size={20} /></button>
+            </div>
+            <form onSubmit={handleAddEvent} className="p-8 space-y-5">
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Event Name</label>
+                <input required type="text" placeholder="e.g. Castle Tour" className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none font-bold" value={newEvent.title} onChange={e => setNewEvent({...newEvent, title: e.target.value})} />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Date</label><input required type="date" className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 outline-none font-bold" value={newEvent.date} onChange={e => setNewEvent({...newEvent, date: e.target.value})} /></div>
+                <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Time</label><input required type="time" className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 outline-none font-bold" value={newEvent.time} onChange={e => setNewEvent({...newEvent, time: e.target.value})} /></div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Location Hub</label>
+                {!newEvent.isSuggestingLocation ? (
+                  <div className="space-y-2">
+                    <select required className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 outline-none font-bold bg-slate-50" value={newEvent.location} onChange={e => setNewEvent({...newEvent, location: e.target.value})}>
+                      <option value="">Choose a Location...</option>
+                      {TOWNS.sort().map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                    <button type="button" onClick={() => setNewEvent({...newEvent, isSuggestingLocation: true})} className="text-[10px] font-bold text-indigo-600 uppercase ml-2 hover:underline">Can't find your town? Suggest one</button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <input required type="text" placeholder="Type town name..." className="w-full px-5 py-3.5 rounded-2xl border-2 border-indigo-100 outline-none font-bold bg-indigo-50/30" value={newEvent.suggestedLocation} onChange={e => setNewEvent({...newEvent, suggestedLocation: e.target.value})} />
+                    <button type="button" onClick={() => setNewEvent({...newEvent, isSuggestingLocation: false})} className="text-[10px] font-bold text-slate-400 uppercase ml-2 hover:underline">Return to list</button>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Web Link (Optional)</label>
+                <div className="relative">
+                  <ExternalLink size={16} className="absolute left-4 top-4 text-slate-400" />
+                  <input type="url" placeholder="https://..." className="w-full pl-12 pr-5 py-3.5 rounded-2xl border border-slate-200 outline-none font-bold placeholder:text-slate-300" value={newEvent.link} onChange={e => setNewEvent({...newEvent, link: e.target.value})} />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 bg-slate-50 p-1 rounded-2xl border border-slate-100">
+                <button type="button" onClick={() => setNewEvent({...newEvent, entryType: 'Free'})} className={`py-2 rounded-xl text-xs font-bold transition-all ${newEvent.entryType === 'Free' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}>Free</button>
+                <button type="button" onClick={() => setNewEvent({...newEvent, entryType: 'Paid'})} className={`py-2 rounded-xl text-xs font-bold transition-all ${newEvent.entryType === 'Paid' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}>Paid</button>
+              </div>
+              {newEvent.entryType === 'Paid' && <input required type="text" placeholder="Price (£)" className="w-full px-5 py-3.5 rounded-2xl border border-indigo-100 outline-none font-bold bg-indigo-50/10" value={newEvent.entryFee} onChange={e => setNewEvent({...newEvent, entryFee: e.target.value.replace(/[^0-9.]/g, '')})} />}
+              
+              <button type="submit" className="w-full py-5 rounded-2xl bg-indigo-600 text-white font-bold shadow-xl shadow-indigo-100 active:scale-95 transition-all">Submit Event</button>
+              
+              <div className="bg-slate-50 border border-slate-100 p-3 rounded-xl flex items-center justify-between">
+                <code className="text-[9px] text-slate-400 truncate max-w-[200px]">{user?.uid}</code>
+                <button type="button" onClick={copyUID} className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-400">{copyFeedback ? <CheckCircle size={12} className="text-green-500"/> : <Copy size={12}/>}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: HUB EXPLORER */}
+      {isTownModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-xl animate-in fade-in duration-300">
+          <div className="w-full max-w-3xl rounded-[2.5rem] bg-white shadow-2xl overflow-hidden max-h-[80vh] overflow-y-auto relative">
+            <div className="absolute inset-0 z-0 opacity-[0.03] pointer-events-none">
+              <img src="https://images.unsplash.com/photo-1510414842594-a61c69b5ae57?q=80&w=800&auto=format&fit=crop" className="w-full h-full object-cover" />
+            </div>
+            <div className="relative z-10 p-8 pb-4 flex justify-between items-center border-b border-slate-100">
+              <h3 className="text-2xl font-bold">Pembrokeshire Hubs</h3>
+              <button onClick={() => setIsTownModalOpen(false)} className="p-2 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-xl transition-colors"><X size={24} /></button>
+            </div>
+            <div className="relative z-10 p-8 grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {TOWNS.sort().map(town => (
+                <button key={town} onClick={() => { setActiveTag(town); setIsTownModalOpen(false); }} className={`p-4 rounded-2xl text-[10px] font-bold text-left transition-all border ${activeTag === town ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg' : 'bg-slate-50 border-slate-100 text-slate-600 hover:bg-slate-100'}`}>{town}</button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default App;
