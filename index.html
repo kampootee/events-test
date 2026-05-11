@@ -364,9 +364,11 @@
                                                 
                                                 <div className="flex-grow min-w-0 pl-5">
                                                     <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                                        <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${event.entryType === 'Free' ? 'bg-green-500 text-white' : 'bg-orange-500 text-white'}`}>
-                                                            {event.entryType === 'Free' ? 'Free' : `£${event.entryFee}`}
-                                                        </span>
+                                                        {event.entryType === 'Paid' && (
+                                                            <span className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-orange-500 text-white">
+                                                                Entry: £{event.entryFee}
+                                                            </span>
+                                                        )}
                                                         {isToday && <span className="text-[8px] font-black uppercase bg-sky-100 text-sky-600 px-2 py-0.5 rounded-full animate-pulse">Happening Today</span>}
                                                         {event.isWeekly && <span className="text-[8px] font-black uppercase bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full border border-indigo-100">Weekly</span>}
                                                     </div>
@@ -442,7 +444,22 @@
                                             <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Location</label>
                                             <input required type="text" placeholder="Town or Venue" className={`w-full px-6 py-4 rounded-2xl border outline-none font-bold ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'}`} value={newEvent.location} onChange={e => setNewEvent({...newEvent, location: e.target.value})} />
                                         </div>
-                                        <div className="space-y-2"><label className="text-[10px] font-black uppercase text-slate-400 ml-2">Entry</label><div className="flex gap-2"><button type="button" onClick={() => setNewEvent({...newEvent, entryType: 'Free'})} className={`flex-1 py-3 rounded-xl font-bold ${newEvent.entryType === 'Free' ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-500'}`}>Free</button><button type="button" onClick={() => setNewEvent({...newEvent, entryType: 'Paid'})} className={`flex-1 py-3 rounded-xl font-bold ${newEvent.entryType === 'Paid' ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-500'}`}>Paid</button></div>{newEvent.entryType === 'Paid' && <input type="text" placeholder="Price (£)" className="w-full mt-2 px-6 py-4 rounded-2xl border outline-none font-bold bg-slate-50 dark:bg-slate-800" value={newEvent.entryFee} onChange={e => setNewEvent({...newEvent, entryFee: e.target.value})} />}</div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Entry</label>
+                                            <div className="flex gap-2">
+                                                <button type="button" onClick={() => setNewEvent({...newEvent, entryType: 'Free'})} className={`flex-1 py-3 rounded-xl font-bold ${newEvent.entryType === 'Free' ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-500'}`}>Free</button>
+                                                <button type="button" onClick={() => setNewEvent({...newEvent, entryType: 'Paid'})} className={`flex-1 py-3 rounded-xl font-bold ${newEvent.entryType === 'Paid' ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-500'}`}>Paid</button>
+                                            </div>
+                                            {newEvent.entryType === 'Paid' && (
+                                                <input 
+                                                    type="text" 
+                                                    placeholder="Price (£)" 
+                                                    className={`w-full mt-2 px-6 py-4 rounded-2xl border outline-none font-bold ${isDarkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-200 border-slate-300 text-slate-900'}`} 
+                                                    value={newEvent.entryFee} 
+                                                    onChange={e => setNewEvent({...newEvent, entryFee: e.target.value})} 
+                                                />
+                                            )}
+                                        </div>
                                         <div className="space-y-2"><label className="text-[10px] font-black uppercase text-slate-400 ml-2">Description</label><textarea rows="3" placeholder="..." className={`w-full px-6 py-4 rounded-2xl border outline-none font-medium ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'}`} value={newEvent.description} onChange={e => setNewEvent({...newEvent, description: e.target.value})}></textarea></div>
                                     </div>
                                     <button type="submit" className="w-full py-6 rounded-3xl bg-indigo-600 text-white font-black text-xl active:scale-95 transition-all">Submit Now</button>
