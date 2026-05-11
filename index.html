@@ -49,11 +49,6 @@
             transform: translateY(-2px);
         }
 
-        /* Tag Styles */
-        .tag-pill {
-            transition: all 0.2s;
-        }
-
         /* Custom scrollbar */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
@@ -72,7 +67,6 @@
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, query, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- CONFIGURATION ---
         const firebaseConfig = window.FIREBASE_CONFIG;
         const ADMIN_UID = window.ADMIN_UID;
         const appId = window.FIREBASE_APP_ID || 'localevents-app';
@@ -80,28 +74,11 @@
         const HEADER_IMAGE_URL = "img/header.jpg";
 
         const AVAILABLE_TAGS = [
-            "Food Festivals", 
-            "Live Music", 
-            "Family Fun Days", 
-            "Arts & Crafts", 
-            "Wellness Meetup", 
-            "Holiday Weekenders", 
-            "Farmers Market", 
-            "Coffee Mornings"
+            "Food Festivals", "Live Music", "Family Fun Days", "Arts & Crafts", 
+            "Wellness Meetup", "Holiday Weekenders", "Farmers Market", "Coffee Mornings"
         ];
 
-        // Map tags to specific background images
-        const TAG_IMAGES = {
-            "Food Festivals": "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?q=80&w=800&auto=format&fit=crop",
-            "Live Music": "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?q=80&w=800&auto=format&fit=crop",
-            "Family Fun Days": "https://images.unsplash.com/photo-1502086223501-7ea6ec798aa2?q=80&w=800&auto=format&fit=crop",
-            "Arts & Crafts": "https://images.unsplash.com/photo-1459908676235-d5f02a50184b?q=80&w=800&auto=format&fit=crop",
-            "Wellness Meetup": "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=800&auto=format&fit=crop",
-            "Holiday Weekenders": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=800&auto=format&fit=crop",
-            "Farmers Market": "https://images.unsplash.com/photo-1488459716781-31db52582fe9?q=80&w=800&auto=format&fit=crop",
-            "Coffee Mornings": "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?q=80&w=800&auto=format&fit=crop",
-            "Default": "https://images.unsplash.com/photo-1510414842594-a61c69b5ae57?q=80&w=800&auto=format&fit=crop"
-        };
+        const TOWNS = ["Tenby", "Haverfordwest", "St Davids", "Pembroke", "Saundersfoot", "Fishguard", "Milford Haven"];
 
         const Icon = ({ name, size = 18, className = "" }) => {
             const containerRef = useRef(null);
@@ -126,21 +103,13 @@
             const [user, setUser] = useState(null);
             const [events, setEvents] = useState([]);
             const [isLoading, setIsLoading] = useState(true);
-            const [errorMsg, setErrorMsg] = useState(null);
             const [viewMode, setViewMode] = useState('list'); 
             const [isModalOpen, setIsModalOpen] = useState(false);
             const [currentDate, setCurrentDate] = useState(new Date());
             const [activeTag, setActiveTag] = useState(null);
             const [searchTerm, setSearchTerm] = useState('');
-            
-            const [isDarkMode, setIsDarkMode] = useState(() => {
-                const savedTheme = localStorage.getItem('pembs-events-theme');
-                return savedTheme === 'dark';
-            });
-            
-            const appInstance = useMemo(() => firebaseConfig ? initializeApp(firebaseConfig) : null, []);
-            const authInstance = useMemo(() => appInstance ? getAuth(appInstance) : null, [appInstance]);
-            const dbInstance = useMemo(() => appInstance ? getFirestore(appInstance) : null, [appInstance]);
+            const [shareFeedback, setShareFeedback] = useState(null);
+            const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('pembs-events-theme') === 'dark');
 
             const isAdmin = user?.uid === ADMIN_UID;
 
@@ -153,33 +122,30 @@
             }, [isDarkMode]);
 
             useEffect(() => {
+                const appInstance = firebaseConfig ? initializeApp(firebaseConfig) : null;
+                const authInstance = appInstance ? getAuth(appInstance) : null;
                 if (!authInstance) return;
-                const initAuth = async () => {
-                    try {
-                        await signInAnonymously(authInstance);
-                    } catch (error) {
-                        setErrorMsg("Network issue.");
-                        setIsLoading(false);
-                    }
-                };
-                initAuth();
+
+                signInAnonymously(authInstance);
                 const unsubscribe = onAuthStateChanged(authInstance, (u) => setUser(u));
                 return () => unsubscribe();
-            }, [authInstance]);
+            }, []);
 
             useEffect(() => {
-                if (!user || !dbInstance) return;
+                if (!user) return;
+                const dbInstance = getFirestore();
                 const eventsCollection = collection(dbInstance, 'artifacts', appId, 'public', 'data', 'events');
                 const unsubscribe = onSnapshot(query(eventsCollection), (snapshot) => {
                     setEvents(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
                     setIsLoading(false);
-                }, (err) => {
-                    setIsLoading(false);
-                });
+                }, () => setIsLoading(false));
                 return () => unsubscribe();
-            }, [user, dbInstance]);
+            }, [user]);
 
             const displayEvents = useMemo(() => {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+
                 let baseEvents = [...events];
                 if (!isAdmin) {
                     baseEvents = baseEvents.filter(e => e.status === 'approved' || (user && e.createdBy === user.uid));
@@ -210,10 +176,16 @@
                     }
                 });
                 
-                let filtered = allInstances;
+                // Filtering & Auto-Expiry
+                let filtered = allInstances.filter(e => {
+                    const eventDate = new Date(e.endDate || e.date);
+                    eventDate.setHours(23, 59, 59, 999);
+                    return eventDate >= today; // Only show future or ongoing events
+                });
+
                 if (activeTag) {
                     filtered = filtered.filter(e => 
-                        e.location?.toLowerCase() === activeTag.toLowerCase() ||
+                        e.location?.toLowerCase().includes(activeTag.toLowerCase()) ||
                         (e.tags && e.tags.some(t => t.toLowerCase() === activeTag.toLowerCase())) ||
                         (e.entryType?.toLowerCase() === activeTag.toLowerCase())
                     );
@@ -233,17 +205,14 @@
             const handleAddEvent = async (e) => {
                 e.preventDefault();
                 if (!newEvent.title || !newEvent.date || !user) return;
-                if (newEvent.entryType === 'Paid' && !newEvent.entryFee) return;
+                const dbInstance = getFirestore();
                 try {
                     const finalTags = [...newEvent.tags];
-                    if (newEvent.isOtherTagSelected && newEvent.otherTag.trim()) {
-                        finalTags.push(newEvent.otherTag.trim());
-                    }
+                    if (newEvent.isOtherTagSelected && newEvent.otherTag.trim()) finalTags.push(newEvent.otherTag.trim());
                     const eventsCollection = collection(dbInstance, 'artifacts', appId, 'public', 'data', 'events');
                     await addDoc(eventsCollection, {
                         ...newEvent,
                         tags: finalTags,
-                        endDate: newEvent.isMultiDay ? newEvent.endDate : '',
                         status: isAdmin ? 'approved' : 'pending',
                         createdBy: user.uid,
                         createdAt: new Date().toISOString()
@@ -254,28 +223,33 @@
             };
 
             const approveEvent = async (id) => {
+                const dbInstance = getFirestore();
                 const eventDoc = doc(dbInstance, 'artifacts', appId, 'public', 'data', 'events', id);
                 await updateDoc(eventDoc, { status: 'approved' });
             };
 
             const deleteEvent = async (id) => {
+                const dbInstance = getFirestore();
                 const eventDoc = doc(dbInstance, 'artifacts', appId, 'public', 'data', 'events', id);
                 await deleteDoc(eventDoc);
             };
 
+            const shareEvent = (event) => {
+                const text = `📅 ${event.title}\n📍 ${event.location}\n⏰ ${event.date} @ ${event.time}\n✨ Find more Pembrokeshire events on Pembs Events!`;
+                const el = document.createElement('textarea');
+                el.value = text;
+                document.body.appendChild(el);
+                el.select();
+                document.execCommand('copy');
+                document.body.removeChild(el);
+                setShareFeedback(event.id);
+                setTimeout(() => setShareFeedback(null), 2000);
+            };
+
             const downloadCalendarFile = (event) => {
-                const formatDate = (dateStr, timeStr) => {
-                    const combined = new Date(`${dateStr}T${timeStr}`);
-                    return combined.toISOString().replace(/-|:|\.\d+/g, '');
-                };
+                const formatDate = (d, t) => new Date(`${d}T${t}`).toISOString().replace(/-|:|\.\d+/g, '');
                 const start = formatDate(event.date, event.time);
-                let end;
-                if (event.endDate && event.endDate !== event.date) {
-                    end = formatDate(event.endDate, "23:59:00");
-                } else {
-                    const endDateObj = new Date(new Date(`${event.date}T${event.time}`).getTime() + 60 * 60 * 1000);
-                    end = endDateObj.toISOString().replace(/-|:|\.\d+/g, '');
-                }
+                const end = event.endDate ? formatDate(event.endDate, "23:59:00") : formatDate(event.date, "23:59:00");
                 const icsData = ["BEGIN:VCALENDAR", "VERSION:2.0", "BEGIN:VEVENT", `SUMMARY:${event.title}`, `DTSTART:${start}`, `DTEND:${end}`, `LOCATION:${event.location}`, `DESCRIPTION:${event.description || ''}`, "END:VEVENT", "END:VCALENDAR"].join("\n");
                 const blob = new Blob([icsData], { type: "text/calendar;charset=utf-8" });
                 const link = document.createElement("a");
@@ -284,29 +258,6 @@
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
-            };
-
-            const calculateDuration = (start, end) => {
-                if (!start || !end) return null;
-                const s = new Date(start);
-                const e = new Date(end);
-                const diffDays = Math.ceil(Math.abs(e - s) / (1000 * 60 * 60 * 24)) + 1;
-                return diffDays > 1 ? `${diffDays} Day Event` : null;
-            };
-
-            const toggleTag = (tag) => {
-                setNewEvent(prev => ({
-                    ...prev,
-                    tags: prev.tags.includes(tag) 
-                        ? prev.tags.filter(t => t !== tag) 
-                        : [...prev.tags, tag]
-                }));
-            };
-
-            const getEventImage = (eventTags) => {
-                if (!eventTags || eventTags.length === 0) return TAG_IMAGES["Default"];
-                const matchedTag = eventTags.find(tag => TAG_IMAGES[tag]);
-                return matchedTag ? TAG_IMAGES[matchedTag] : TAG_IMAGES["Default"];
             };
 
             const renderCalendar = () => {
@@ -324,7 +275,7 @@
                             <span className={`text-xs font-bold ${dayEvents.length > 0 ? 'text-sky-500 font-black' : (isDarkMode ? 'text-slate-600' : 'text-slate-400')}`}>{d}</span>
                             <div className="mt-2 space-y-1 overflow-y-auto max-h-20">
                                 {dayEvents.map(event => (
-                                    <div key={event.id} onClick={() => { setActiveTag(event.location); setViewMode('list'); }} className={`text-[9px] truncate px-1.5 py-0.5 rounded-md cursor-pointer font-bold transition-all shadow-sm ${isDarkMode ? 'bg-slate-700 text-sky-400 border border-slate-600' : 'bg-white text-sky-700 border border-sky-100'}`}>
+                                    <div key={event.id} onClick={() => { setActiveTag(event.location); setViewMode('list'); }} className={`text-[9px] truncate px-1.5 py-0.5 rounded-md cursor-pointer font-bold shadow-sm ${isDarkMode ? 'bg-slate-700 text-sky-400' : 'bg-white text-sky-700'}`}>
                                         {event.time} {event.title}
                                     </div>
                                 ))}
@@ -335,269 +286,166 @@
                 return days;
             };
 
-            if (isLoading) return (
-                <div className={`min-h-screen flex flex-col items-center justify-center space-y-6 ${isDarkMode ? 'bg-[#121212]' : 'bg-white'}`}>
-                    <div className="relative"><div className={`w-16 h-16 border-4 rounded-full ${isDarkMode ? 'border-slate-800' : 'border-sky-50'}`}></div><div className="w-16 h-16 border-4 border-t-sky-600 rounded-full animate-spin absolute top-0 left-0"></div></div>
-                    <p className={`font-bold text-sm tracking-widest uppercase ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>Loading Pembs Events</p>
-                </div>
-            );
+            if (isLoading) return <div className={`min-h-screen flex items-center justify-center ${isDarkMode ? 'bg-[#121212]' : 'bg-white'}`}><Icon name="loader-2" className="animate-spin text-sky-600" size={32} /></div>;
 
             return (
                 <div className={`min-h-screen pb-20 ${isDarkMode ? 'bg-[#121212] text-slate-100' : 'bg-[#f8fafc] text-slate-900'}`}>
                     <nav className={`glass-effect sticky top-0 z-40 border-b shadow-sm ${isDarkMode ? 'bg-[#1a1a1a]/80 border-slate-800' : 'bg-white/85 border-slate-200/60'}`}>
                         <div className="max-w-6xl mx-auto px-6 h-16 sm:h-20 flex items-center justify-between gap-4">
-                            <div className="flex items-center gap-4 cursor-pointer group shrink-0" onClick={() => {setActiveTag(null); setSearchTerm('');}}>
-                                <div className="bg-gradient-to-tr from-sky-600 to-indigo-600 p-2 rounded-xl shadow-lg shadow-sky-100 transition-all"><Icon name="waves" className="text-white" size={20} /></div>
-                                <h1 className="hidden md:block text-lg sm:text-xl font-black tracking-tight leading-none">Pembs Events</h1>
+                            <div className="flex items-center gap-4 cursor-pointer" onClick={() => {setActiveTag(null); setSearchTerm('');}}>
+                                <div className="bg-sky-600 p-2 rounded-xl shadow-lg shadow-sky-200"><Icon name="waves" className="text-white" size={20} /></div>
+                                <h1 className="hidden md:block text-lg font-black">Pembs Events</h1>
                             </div>
 
-                            <div className="flex-grow max-w-sm relative group">
-                                <Icon name="search" size={14} className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${searchTerm ? 'text-sky-500' : 'text-slate-400'}`} />
+                            <div className="flex-grow max-w-sm relative">
+                                <Icon name="search" size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
                                 <input 
-                                    type="text" 
-                                    placeholder="Search tags or locations..." 
-                                    className={`w-full pl-10 pr-4 py-2.5 rounded-2xl text-xs font-bold outline-none transition-all ${isDarkMode ? 'bg-slate-800/80 border-slate-700 text-white placeholder:text-slate-500 focus:bg-slate-800' : 'bg-slate-100/80 border-slate-200/50 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:ring-4 focus:ring-sky-100/50'}`}
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    type="text" placeholder="Search..." 
+                                    className={`w-full pl-10 pr-4 py-2.5 rounded-2xl text-xs font-bold outline-none ${isDarkMode ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-900'}`}
+                                    value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
                                 />
-                                {searchTerm && (
-                                    <button onClick={() => setSearchTerm('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500 transition-colors"><Icon name="x-circle" size={14} /></button>
-                                )}
                             </div>
                             
-                            <div className="flex items-center gap-2 sm:gap-4 shrink-0">
-                                <button 
-                                    onClick={() => setIsDarkMode(!isDarkMode)} 
-                                    className={`p-2.5 rounded-xl transition-all ${isDarkMode ? 'bg-slate-800 text-amber-400 hover:bg-slate-700' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
-                                    title={isDarkMode ? "Switch to Light Mode" : "Switch to Night Mode"}
-                                >
-                                    <Icon name={isDarkMode ? "sun" : "moon"} size={18} />
-                                </button>
-                                <div className={`hidden sm:flex p-1 rounded-xl border ${isDarkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-slate-100/80 border-slate-200/50'}`}>
-                                    <button onClick={() => setViewMode('list')} className={`px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${viewMode === 'list' ? (isDarkMode ? 'bg-slate-700 text-sky-400' : 'bg-white shadow-sm text-sky-600') : 'text-slate-500 hover:text-slate-400'}`}><Icon name="layout-list" size={14} /></button>
-                                    <button onClick={() => setViewMode('calendar')} className={`px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${viewMode === 'calendar' ? (isDarkMode ? 'bg-slate-700 text-sky-400' : 'bg-white shadow-sm text-sky-600') : 'text-slate-500 hover:text-slate-400'}`}><Icon name="calendar" size={14} /></button>
+                            <div className="flex items-center gap-2 shrink-0">
+                                <button onClick={() => setIsDarkMode(!isDarkMode)} className={`p-2.5 rounded-xl ${isDarkMode ? 'bg-slate-800 text-amber-400' : 'bg-slate-100 text-slate-500'}`}><Icon name={isDarkMode ? "sun" : "moon"} size={18} /></button>
+                                <div className="hidden sm:flex bg-slate-100 p-1 rounded-xl">
+                                    <button onClick={() => setViewMode('list')} className={`px-3 py-2 rounded-lg ${viewMode === 'list' ? 'bg-white text-sky-600 shadow-sm' : 'text-slate-500'}`}><Icon name="layout-list" size={14} /></button>
+                                    <button onClick={() => setViewMode('calendar')} className={`px-3 py-2 rounded-lg ${viewMode === 'calendar' ? 'bg-white text-sky-600 shadow-sm' : 'text-slate-500'}`}><Icon name="calendar" size={14} /></button>
                                 </div>
-                                <button onClick={() => setIsModalOpen(true)} className="bg-slate-900 hover:bg-slate-800 text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl flex items-center gap-2 text-[10px] sm:text-sm font-bold shadow-xl active:scale-95 transition-all border border-transparent">
-                                    <Icon name="plus" size={14} className="text-sky-400" />
-                                    <span className="hidden xs:inline">{isAdmin ? "New" : "Submit"}</span>
-                                </button>
+                                <button onClick={() => setIsModalOpen(true)} className="bg-slate-900 text-white px-4 py-2.5 rounded-xl flex items-center gap-2 text-xs font-bold"><Icon name="plus" size={14} className="text-sky-400" /> Submit</button>
                             </div>
                         </div>
                     </nav>
 
-                    <div className="relative w-full h-[300px] sm:h-[400px] overflow-hidden">
-                        <img src={HEADER_IMAGE_URL} alt="Header" className="absolute inset-0 w-full h-full object-cover" onerror="this.src='https://images.unsplash.com/photo-1589136561243-d3450d03227a?q=80&w=2070&auto=format&fit=crop'"/>
+                    <div className="relative w-full h-72 sm:h-96 overflow-hidden">
+                        <img src={HEADER_IMAGE_URL} alt="Header" className="w-full h-full object-cover" onerror="this.src='https://images.unsplash.com/photo-1510414842594-a61c69b5ae57?q=80&w=1200&auto=format&fit=crop'"/>
                         <div className="absolute inset-0 hero-gradient flex items-end">
-                            <div className="max-w-6xl mx-auto px-6 w-full pb-10 sm:pb-16 text-white animate-in fade-in slide-in-from-bottom-6 duration-700">
-                                <div className="flex items-center gap-3 mb-4">
-                                    {isAdmin && <span className="bg-sky-600/80 backdrop-blur-md text-white text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-tighter shadow-xl">Admin Mode</span>}
-                                    <span className="bg-white/10 backdrop-blur-md text-white/80 text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-widest border border-white/10">What's Happening</span>
-                                </div>
-                                <h2 className="text-4xl sm:text-6xl font-black tracking-tighter mb-4">Pembrokeshire Events</h2>
-                                <p className="text-white/70 text-base sm:text-lg font-medium max-w-xl leading-relaxed">Discover upcoming gatherings and activities across the coast and countryside.</p>
+                            <div className="max-w-6xl mx-auto px-6 pb-12 w-full text-white">
+                                <h2 className="text-4xl sm:text-6xl font-black tracking-tighter mb-2">Pembrokeshire Events</h2>
+                                <p className="text-white/70 font-medium max-w-xl">The coastal guide to what's happening across Pembrokeshire.</p>
                             </div>
                         </div>
                     </div>
 
-                    <main className="max-w-6xl mx-auto px-6 py-8">
+                    <div className="max-w-6xl mx-auto px-6 -mt-6 relative z-10">
+                        <div className={`p-4 rounded-[2rem] border shadow-xl flex flex-wrap gap-2 items-center ${isDarkMode ? 'bg-[#1a1a1a] border-slate-800' : 'bg-white border-slate-200/50'}`}>
+                            <span className="text-[10px] font-black uppercase text-slate-400 mr-2 flex items-center gap-1"><Icon name="map-pin" size={12}/> Local Hubs:</span>
+                            {TOWNS.map(town => (
+                                <button key={town} onClick={() => setActiveTag(town)} className={`px-4 py-1.5 rounded-full text-[10px] font-bold transition-all ${activeTag === town ? 'bg-sky-600 text-white' : (isDarkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}`}>
+                                    {town}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <main className="max-w-6xl mx-auto px-6 py-12">
                         {viewMode === 'list' ? (
                             <div className="space-y-6">
                                 {(activeTag || searchTerm) && (
-                                    <div className={`flex items-center gap-3 border p-3 pl-5 rounded-2xl shadow-sm animate-in slide-in-from-right-4 ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-sky-100'}`}>
+                                    <div className={`flex items-center gap-3 border p-4 rounded-3xl shadow-sm ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-sky-100'}`}>
                                         <Icon name={searchTerm ? "search" : "tag"} size={18} className="text-sky-500" /> 
-                                        <span className={`text-sm font-bold ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                                            {searchTerm ? `Searching for "${searchTerm}"` : `Showing: ${activeTag}`}
-                                        </span>
-                                        <button onClick={() => {setActiveTag(null); setSearchTerm('');}} className={`ml-auto p-2 rounded-2xl transition-colors flex items-center gap-2 px-4 ${isDarkMode ? 'bg-slate-700 text-slate-400 hover:text-red-400' : 'bg-slate-50 text-slate-400 hover:text-red-500'}`}>
-                                            <span className="text-[10px] font-black uppercase">Clear Filters</span>
-                                            <Icon name="x" size={16}/>
-                                        </button>
+                                        <span className="text-sm font-bold">Showing {searchTerm ? `results for "${searchTerm}"` : `events in ${activeTag}`}</span>
+                                        <button onClick={() => {setActiveTag(null); setSearchTerm('');}} className="ml-auto text-[10px] font-black uppercase text-red-500 bg-red-50 px-4 py-2 rounded-xl">Clear All</button>
                                     </div>
                                 )}
 
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                                     {displayEvents.length > 0 ? displayEvents.flatMap((event, index) => {
                                         const isMyOwn = user && event.createdBy === user.uid;
-                                        const durationText = calculateDuration(event.date, event.endDate);
-                                        const eventImage = getEventImage(event.tags);
-                                        
+                                        const isToday = new Date(event.date).toDateString() === new Date().toDateString();
                                         const items = [];
                                         
-                                        // Standard Event Card (Compact, "Skinny" version)
                                         items.push(
-                                            <div key={event.id} className={`event-card p-4 sm:p-5 rounded-3xl border shadow-sm hover:shadow-lg relative overflow-hidden group ${isDarkMode ? 'bg-[#1a1a1a] border-slate-800 hover:border-slate-700' : 'bg-white border-slate-200/60 hover:border-sky-100/50'} ${event.status === 'pending' ? (isDarkMode ? 'bg-amber-900/5' : 'bg-amber-50/5') : ''}`}>
+                                            <div key={event.id} className={`event-card flex p-4 sm:p-5 rounded-3xl border-l-4 shadow-sm hover:shadow-lg relative group ${isDarkMode ? 'bg-[#1a1a1a] border-slate-800' : 'bg-white border-slate-200/60'} ${isToday ? 'border-l-sky-500' : 'border-l-indigo-600/20'}`}>
+                                                <div className={`flex-shrink-0 flex flex-col items-center justify-center w-14 h-16 rounded-2xl border ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
+                                                    <span className="text-[9px] font-black uppercase tracking-widest opacity-60">{new Date(event.date).toLocaleDateString('en-US', { month: 'short' })}</span>
+                                                    <span className="text-2xl font-black leading-none">{new Date(event.date).getDate()}</span>
+                                                </div>
                                                 
-                                                {/* Faded Background Image Layer */}
-                                                <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
-                                                    <img src={eventImage} className={`w-full h-full object-cover transition-opacity duration-500 ${isDarkMode ? 'opacity-[0.12]' : 'opacity-[0.08]'}`} alt="" />
+                                                <div className="flex-grow min-w-0 pl-5">
+                                                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                                        <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${event.entryType === 'Free' ? 'bg-green-500 text-white' : 'bg-orange-500 text-white'}`}>
+                                                            {event.entryType === 'Free' ? 'Free' : `£${event.entryFee}`}
+                                                        </span>
+                                                        {isToday && <span className="text-[8px] font-black uppercase bg-sky-100 text-sky-600 px-2 py-0.5 rounded-full animate-pulse">Happening Today</span>}
+                                                        {event.isWeekly && <span className="text-[8px] font-black uppercase bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full border border-indigo-100">Weekly</span>}
+                                                    </div>
+                                                    <h3 className="text-lg font-extrabold truncate">{event.title}</h3>
+                                                    <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs font-semibold text-slate-400">
+                                                        <div className="flex items-center gap-1.5"><Icon name="clock" size={12} className="text-sky-500" /> {event.time}</div>
+                                                        <button onClick={() => setActiveTag(event.location)} className="flex items-center gap-1.5 hover:text-sky-600"><Icon name="map-pin" size={12} className="text-sky-500" /> {event.location}</button>
+                                                    </div>
                                                 </div>
 
-                                                <div className="relative z-10 flex items-center gap-4 sm:gap-5">
-                                                    <div className={`flex-shrink-0 flex flex-col items-center justify-center w-14 h-16 rounded-2xl border transition-all duration-300 shadow-sm ${isDarkMode ? 'bg-slate-800 border-slate-700 group-hover:bg-sky-600 group-hover:text-white' : 'bg-slate-50 border-slate-100 group-hover:bg-sky-600 group-hover:text-white'}`}>
-                                                        <span className="text-[9px] font-black uppercase tracking-widest opacity-60">{new Date(event.date).toLocaleDateString('en-US', { month: 'short' })}</span>
-                                                        <span className="text-2xl font-black leading-none">{new Date(event.date).getDate()}</span>
-                                                    </div>
-                                                    
-                                                    <div className="flex-grow min-w-0">
-                                                        <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                                            <button onClick={() => setActiveTag(event.entryType)} className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full shadow-sm border ${event.entryType === 'Free' ? (isDarkMode ? 'bg-green-900/30 text-green-400 border-green-800' : 'bg-green-50 text-green-700 border-green-200') : (isDarkMode ? 'bg-orange-900/30 text-orange-400 border-orange-800' : 'bg-orange-50 text-orange-700 border-orange-200')}`}>
-                                                                {event.entryType === 'Free' ? 'Free Entry' : `Entry: £${event.entryFee}`}
-                                                            </button>
-                                                            {event.tags && event.tags.map(t => (
-                                                                <button key={t} onClick={() => setActiveTag(t)} className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full shadow-sm border tag-pill ${isDarkMode ? 'bg-slate-800 text-slate-400 border-slate-700 hover:text-sky-400' : 'bg-f1f5f9 text-slate-500 border-slate-100 hover:text-sky-600'}`}>{t}</button>
-                                                            ))}
-                                                            {event.status === 'pending' && <span className="text-[8px] font-black bg-amber-500 text-white px-2 py-0.5 rounded-full shadow-md">Reviewing</span>}
-                                                            {event.isWeekly && <span className={`text-[8px] font-black px-2 py-0.5 rounded-full border uppercase tracking-tighter ${isDarkMode ? 'bg-amber-900/30 text-amber-400 border-amber-800' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>Weekly</span>}
-                                                            {durationText && <span className={`text-[8px] font-black px-2 py-0.5 rounded-full border uppercase tracking-tighter ${isDarkMode ? 'bg-indigo-900/30 text-indigo-400 border-indigo-800' : 'bg-indigo-50 text-indigo-600 border-indigo-100'}`}>{durationText}</span>}
-                                                        </div>
-                                                        <h3 className={`text-lg font-extrabold group-hover:text-sky-500 transition-colors truncate ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}>{event.title}</h3>
-                                                        <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
-                                                            <div className={`flex items-center gap-1.5 text-xs font-semibold ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}><Icon name="clock" size={12} className="text-sky-500" /> {event.time}</div>
-                                                            <button onClick={() => setActiveTag(event.location)} className={`flex items-center gap-1.5 text-xs font-semibold transition-colors ${isDarkMode ? 'text-slate-500 hover:text-sky-400' : 'text-slate-400 hover:text-sky-600'}`}><Icon name="map-pin" size={12} className="text-sky-500" /> {event.location}</button>
-                                                            {event.contact && <div className={`flex items-center gap-1.5 text-xs font-semibold ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}><Icon name="mail" size={12} className="text-sky-500" /> {event.contact}</div>}
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="flex flex-row sm:flex-col gap-2 shrink-0 items-center">
-                                                        {event.status === 'approved' && (
-                                                            <button onClick={() => downloadCalendarFile(event)} className={`md:hidden w-10 h-10 border rounded-xl flex items-center justify-center transition-all active:scale-90 ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-400 hover:text-sky-400' : 'bg-slate-50 border-slate-100 text-slate-400 hover:text-sky-600'}`}>
-                                                                <div className="relative"><Icon name="calendar" size={18} /><span className="absolute -top-1 -right-1 text-[10px] font-black text-sky-600 bg-white rounded-full leading-none">+</span></div>
-                                                            </button>
-                                                        )}
-                                                        {isAdmin && event.status === 'pending' && !event.isVirtual && <button onClick={() => approveEvent(event.id)} className="w-10 h-10 bg-green-500 text-white rounded-xl flex items-center justify-center hover:bg-green-600 shadow-md transition-all active:scale-90"><Icon name="check" size={20} /></button>}
-                                                        {(isAdmin || (isMyOwn && event.status === 'pending')) && !event.isVirtual && <button onClick={() => deleteEvent(event.id)} className={`w-10 h-10 border rounded-xl flex items-center justify-center transition-all shadow-sm active:scale-90 ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-500 hover:text-red-400' : 'bg-white border-slate-100 text-slate-300 hover:text-red-500'}`}><Icon name="trash-2" size={18} /></button>}
-                                                    </div>
+                                                <div className="flex gap-2 shrink-0 ml-2">
+                                                    <button onClick={() => shareEvent(event)} className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${shareFeedback === event.id ? 'bg-green-500 text-white' : (isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-50 text-slate-400')}`}>
+                                                        <Icon name={shareFeedback === event.id ? "check" : "share-2"} size={16} />
+                                                    </button>
+                                                    {isAdmin && event.status === 'pending' && !event.isVirtual && <button onClick={() => approveEvent(event.id)} className="w-10 h-10 bg-green-500 text-white rounded-xl flex items-center justify-center shadow-md"><Icon name="check" size={20} /></button>}
+                                                    {(isAdmin || (isMyOwn && event.status === 'pending')) && !event.isVirtual && <button onClick={() => deleteEvent(event.id)} className="w-10 h-10 bg-white border border-red-100 text-red-500 rounded-xl flex items-center justify-center hover:bg-red-500 hover:text-white"><Icon name="trash-2" size={18} /></button>}
                                                 </div>
                                             </div>
                                         );
 
-                                        // INTEGRATED SPONSOR SLOT
                                         if ((index + 1) % 10 === 0) {
                                             items.push(
-                                                <a 
-                                                    href="https://example.com/advertise" 
-                                                    target="_blank" 
-                                                    rel="noopener noreferrer"
-                                                    key={`ad-${index}`} 
-                                                    className={`event-card block p-4 sm:p-5 rounded-3xl border-2 border-dashed relative overflow-hidden group transition-all duration-500 ${isDarkMode ? 'bg-orange-950/10 border-orange-500/40 hover:bg-orange-900/20 hover:border-orange-400 shadow-[0_0_20px_-5px_rgba(249,115,22,0.15)]' : 'bg-orange-50 border-orange-400/60 hover:bg-orange-100/50 hover:border-orange-500 shadow-[0_0_20px_-5px_rgba(249,115,22,0.1)]'}`}
-                                                >
-                                                    <div className="flex items-center gap-4 sm:gap-5">
-                                                        <div className={`flex-shrink-0 flex flex-col items-center justify-center w-14 h-16 rounded-2xl transition-all duration-300 ${isDarkMode ? 'bg-orange-900/40 text-orange-400' : 'bg-orange-100 text-orange-600'}`}>
-                                                            <Icon name="megaphone" size={24} />
+                                                <a href="https://example.com/advertise" target="_blank" rel="noopener noreferrer" key={`ad-${index}`} className={`event-card block p-5 rounded-3xl border-2 border-dashed transition-all ${isDarkMode ? 'bg-orange-950/10 border-orange-500/40 shadow-orange-500/10 shadow-lg' : 'bg-orange-50 border-orange-400/60 shadow-orange-200 shadow-lg'}`}>
+                                                    <div className="flex items-center gap-4">
+                                                        <div className={`flex-shrink-0 flex items-center justify-center w-12 h-12 rounded-2xl ${isDarkMode ? 'bg-orange-900/40 text-orange-400' : 'bg-orange-100 text-orange-600'}`}><Icon name="megaphone" size={24} /></div>
+                                                        <div className="flex-grow">
+                                                            <h3 className="text-base font-black uppercase tracking-tighter">Feature Your Event Here</h3>
+                                                            <p className="text-[10px] font-medium opacity-60">Reach the entire Pembrokeshire community daily.</p>
                                                         </div>
-                                                        <div className="flex-grow min-w-0">
-                                                            <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                                                <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border ${isDarkMode ? 'bg-orange-900/30 text-orange-300 border-orange-800/50' : 'bg-white text-orange-700 border-orange-200'}`}>Featured Spot</span>
-                                                            </div>
-                                                            <h3 className={`text-lg font-extrabold truncate ${isDarkMode ? 'text-orange-100' : 'text-orange-900'}`}>Promote Your Event</h3>
-                                                            <p className={`text-[10px] font-medium leading-relaxed truncate ${isDarkMode ? 'text-orange-400/60' : 'text-orange-600/70'}`}>Click here to reach the local Pembrokeshire community.</p>
-                                                        </div>
-                                                        <div className="shrink-0 flex items-center justify-center w-10 h-10">
-                                                            <Icon name="external-link" size={16} className={isDarkMode ? 'text-orange-800 group-hover:text-orange-400' : 'text-orange-300 group-hover:text-orange-600'} />
-                                                        </div>
+                                                        <Icon name="external-link" size={16} className="opacity-30" />
                                                     </div>
                                                 </a>
                                             );
                                         }
-
                                         return items;
-                                    }) : (
-                                        <div className={`lg:col-span-2 text-center py-20 rounded-[3rem] border-4 border-dashed ${isDarkMode ? 'bg-[#1a1a1a] border-slate-800' : 'bg-white border-slate-100'}`}>
-                                            <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 ${isDarkMode ? 'bg-slate-800' : 'bg-slate-50'}`}><Icon name="calendar-x" size={32} className="text-slate-600" /></div>
-                                            <h3 className={`text-xl font-black ${isDarkMode ? 'text-slate-400' : 'text-slate-800'}`}>No events found</h3>
-                                            <p className="text-slate-500 mt-2 font-medium">Try a different search or clear your filters.</p>
-                                        </div>
-                                    )}
+                                    }) : <div className="lg:col-span-2 text-center py-20 opacity-50"><Icon name="calendar-x" size={48} className="mx-auto mb-4" /><h3 className="text-xl font-bold">No events found</h3></div>}
                                 </div>
                             </div>
                         ) : (
-                            <div className={`rounded-[3.5rem] border shadow-2xl overflow-hidden animate-in zoom-in duration-500 ${isDarkMode ? 'bg-[#1a1a1a] border-slate-800' : 'bg-white border-slate-200/60'}`}>
-                                <div className={`p-10 flex flex-col sm:flex-row sm:items-center justify-between border-b gap-6 ${isDarkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-slate-50/50 border-slate-100'}`}>
-                                    <h2 className={`text-4xl font-black tracking-tighter leading-none ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}>{currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</h2>
+                            <div className={`rounded-[3.5rem] border shadow-2xl overflow-hidden ${isDarkMode ? 'bg-[#1a1a1a] border-slate-800' : 'bg-white border-slate-200/60'}`}>
+                                <div className="p-10 flex flex-col sm:flex-row sm:items-center justify-between border-b gap-6">
+                                    <h2 className="text-4xl font-black tracking-tighter">{currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</h2>
                                     <div className="flex gap-4">
-                                        <button onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() - 1)))} className={`w-12 h-12 flex items-center justify-center border rounded-2xl transition-all shadow-sm ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700' : 'bg-white border-slate-200 hover:bg-slate-50'}`}><Icon name="chevron-left" /></button>
-                                        <button onClick={() => setCurrentDate(new Date())} className={`px-8 h-12 border rounded-2xl text-xs font-black transition-all shadow-sm uppercase tracking-widest ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'}`}>Today</button>
-                                        <button onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() + 1)))} className={`w-12 h-12 flex items-center justify-center border rounded-2xl transition-all shadow-sm ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700' : 'bg-white border-slate-200 hover:bg-slate-50'}`}><Icon name="chevron-right" /></button>
+                                        <button onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() - 1)))} className="w-12 h-12 flex items-center justify-center border rounded-2xl"><Icon name="chevron-left" /></button>
+                                        <button onClick={() => setCurrentDate(new Date())} className="px-8 h-12 border rounded-2xl text-xs font-black uppercase">Today</button>
+                                        <button onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() + 1)))} className="w-12 h-12 flex items-center justify-center border rounded-2xl"><Icon name="chevron-right" /></button>
                                     </div>
                                 </div>
-                                <div className={`calendar-grid text-center py-6 border-b ${isDarkMode ? 'bg-[#121212] border-slate-800' : 'bg-white border-slate-50'}`}>{['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => <div key={day} className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">{day}</div>)}</div>
-                                <div className={`${isDarkMode ? 'bg-[#121212]' : 'bg-white'} calendar-grid`}>{renderCalendar()}</div>
+                                <div className="calendar-grid text-center py-6 border-b border-slate-50 opacity-40">{['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => <div key={day} className="text-[10px] font-black uppercase tracking-widest">{day}</div>)}</div>
+                                <div className="calendar-grid">{renderCalendar()}</div>
                             </div>
                         )}
                     </main>
 
                     {isModalOpen && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xl animate-in fade-in duration-200">
-                            <div className={`w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in slide-in-from-bottom-8 duration-500 max-h-[90vh] overflow-y-auto ${isDarkMode ? 'bg-[#1a1a1a]' : 'bg-white'}`}>
-                                <div className={`p-8 sm:p-12 pb-0 flex justify-between items-start sticky top-0 z-10 ${isDarkMode ? 'bg-[#1a1a1a]' : 'bg-white'}`}>
-                                    <div><h3 className={`text-3xl sm:text-4xl font-black tracking-tighter ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}>{isAdmin ? "New Event" : "Suggest Event"}</h3><p className="text-slate-500 text-sm font-medium mt-2">Help the community grow by sharing an event.</p></div>
-                                    <button onClick={() => setIsModalOpen(false)} className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${isDarkMode ? 'bg-slate-800 text-slate-400 hover:bg-red-900/50 hover:text-red-400' : 'bg-slate-50 text-slate-400 hover:bg-red-50 hover:text-red-500'}`}><Icon name="x" size={24} /></button>
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-xl">
+                            <div className={`w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto ${isDarkMode ? 'bg-[#1a1a1a]' : 'bg-white'}`}>
+                                <div className="p-8 pb-0 flex justify-between items-start sticky top-0 bg-inherit z-10">
+                                    <div><h3 className="text-3xl font-black tracking-tighter">{isAdmin ? "New Event" : "Suggest Event"}</h3></div>
+                                    <button onClick={() => setIsModalOpen(false)} className="w-12 h-12 rounded-2xl flex items-center justify-center bg-slate-100 dark:bg-slate-800"><Icon name="x" size={24} /></button>
                                 </div>
-                                <form onSubmit={handleAddEvent} className="p-8 sm:p-12 space-y-8">
-                                    <div className="grid gap-8">
-                                        <div className="space-y-3">
-                                            <label className={`text-[10px] font-black uppercase tracking-[0.2em] ml-2 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>Event Title</label>
-                                            <input required type="text" placeholder="e.g. Village Market Day" className={`w-full px-8 py-5 rounded-3xl border outline-none font-bold text-lg transition-all ${isDarkMode ? 'bg-slate-800 border-slate-700 text-white placeholder:text-slate-600 focus:border-sky-600' : 'bg-slate-50 border-slate-100 placeholder:text-slate-300 focus:ring-4 focus:ring-sky-100/50'}`} value={newEvent.title} onChange={e => setNewEvent({...newEvent, title: e.target.value})} />
+                                <form onSubmit={handleAddEvent} className="p-8 space-y-6">
+                                    <div className="grid gap-6">
+                                        <div className="space-y-2"><label className="text-[10px] font-black uppercase text-slate-400 ml-2">Title</label><input required type="text" placeholder="Event Name" className={`w-full px-6 py-4 rounded-2xl border outline-none font-bold ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'}`} value={newEvent.title} onChange={e => setNewEvent({...newEvent, title: e.target.value})} /></div>
+                                        <div className="grid grid-cols-2 gap-6">
+                                            <div className="space-y-2"><label className="text-[10px] font-black uppercase text-slate-400 ml-2">Date</label><input required type="date" className={`w-full px-6 py-4 rounded-2xl border outline-none font-bold ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'}`} value={newEvent.date} onChange={e => setNewEvent({...newEvent, date: e.target.value})} /></div>
+                                            <div className="space-y-2"><label className="text-[10px] font-black uppercase text-slate-400 ml-2">Time</label><input required type="time" className={`w-full px-6 py-4 rounded-2xl border outline-none font-bold ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'}`} value={newEvent.time} onChange={e => setNewEvent({...newEvent, time: e.target.value})} /></div>
                                         </div>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
-                                            <div className="space-y-3">
-                                                <label className={`text-[10px] font-black uppercase tracking-[0.2em] ml-2 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>Start Date</label>
-                                                <input required type="date" className={`w-full px-8 py-5 rounded-3xl border outline-none font-bold transition-all ${isDarkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-100'}`} value={newEvent.date} onChange={e => setNewEvent({...newEvent, date: e.target.value})} />
-                                            </div>
-                                            <div className="space-y-3">
-                                                <label className={`text-[10px] font-black uppercase tracking-[0.2em] ml-2 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>Start Time</label>
-                                                <input required type="time" className={`w-full px-8 py-5 rounded-3xl border outline-none font-bold transition-all ${isDarkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-100'}`} value={newEvent.time} onChange={e => setNewEvent({...newEvent, time: e.target.value})} />
-                                            </div>
+                                        <div className={`p-6 rounded-3xl border space-y-4 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
+                                            <label className="flex items-center gap-3 cursor-pointer"><input type="checkbox" className="hidden" checked={newEvent.isWeekly} onChange={() => setNewEvent(p => ({...p, isWeekly: !p.isWeekly}))} /><div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${newEvent.isWeekly ? 'bg-sky-600 border-sky-600' : 'border-slate-300'}`}>{newEvent.isWeekly && <Icon name="check" size={14} className="text-white" />}</div><span className="text-sm font-bold">Runs weekly?</span></label>
                                         </div>
-                                        <div className={`p-6 rounded-[2rem] border space-y-4 ${isDarkMode ? 'bg-[#121212] border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
-                                            <label className="flex items-center gap-3 cursor-pointer group">
-                                                <input type="checkbox" className="hidden" checked={newEvent.isMultiDay} onChange={() => setNewEvent(p => ({...p, isMultiDay: !p.isMultiDay, endDate: !p.isMultiDay ? p.date : ''}))} />
-                                                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${newEvent.isMultiDay ? 'bg-sky-600 border-sky-600' : 'border-slate-600'}`}>
-                                                    {newEvent.isMultiDay && <Icon name="check" size={14} className="text-white" />}
-                                                </div>
-                                                <span className="text-sm font-bold">Multi-day event?</span>
-                                            </label>
-                                            {newEvent.isMultiDay && <div className="space-y-3 pt-2 animate-in slide-in-from-top-2 duration-200"><label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] ml-2">Finish Date</label><input required type="date" min={newEvent.date} className={`w-full px-8 py-5 rounded-3xl border outline-none font-bold ${isDarkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200'}`} value={newEvent.endDate} onChange={e => setNewEvent({...newEvent, endDate: e.target.value})} /></div>}
-                                            
-                                            <div className="h-px bg-slate-200 dark:bg-slate-800 my-2"></div>
-                                            
-                                            <label className="flex items-center gap-3 cursor-pointer group">
-                                                <input type="checkbox" className="hidden" checked={newEvent.isWeekly} onChange={() => setNewEvent(p => ({...p, isWeekly: !p.isWeekly}))} />
-                                                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${newEvent.isWeekly ? 'bg-amber-600 border-amber-600' : 'border-slate-600'}`}>
-                                                    {newEvent.isWeekly && <Icon name="check" size={14} className="text-white" />}
-                                                </div>
-                                                <span className="text-sm font-bold">Does this run every week?</span>
-                                            </label>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Location</label>
+                                            <input required type="text" placeholder="Town or Venue" className={`w-full px-6 py-4 rounded-2xl border outline-none font-bold ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'}`} value={newEvent.location} onChange={e => setNewEvent({...newEvent, location: e.target.value})} />
                                         </div>
-                                        <div className="space-y-3">
-                                            <label className={`text-[10px] font-black uppercase tracking-[0.2em] ml-2 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>Entry Details</label>
-                                            <div className={`grid grid-cols-2 gap-4 p-1 rounded-3xl border ${isDarkMode ? 'bg-[#121212] border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
-                                                <button type="button" onClick={() => setNewEvent({...newEvent, entryType: 'Free', entryFee: ''})} className={`py-3 px-6 rounded-2xl text-sm font-bold transition-all ${newEvent.entryType === 'Free' ? (isDarkMode ? 'bg-slate-800 text-sky-400 shadow-md' : 'bg-white shadow-md text-sky-600') : 'text-slate-50'}`}>Free</button>
-                                                <button type="button" onClick={() => setNewEvent({...newEvent, entryType: 'Paid'})} className={`py-3 px-6 rounded-2xl text-sm font-bold transition-all ${newEvent.entryType === 'Paid' ? (isDarkMode ? 'bg-slate-800 text-sky-400 shadow-md' : 'bg-white shadow-md text-sky-600') : 'text-slate-50'}`}>Paid</button>
-                                            </div>
-                                            {newEvent.entryType === 'Paid' && <div className="relative pt-2 animate-in slide-in-from-top-2 duration-200"><span className="absolute left-6 top-1/2 -translate-y-1/2 font-bold text-slate-400">£</span><input required type="text" placeholder="5.00" className={`w-full pl-10 pr-8 py-5 rounded-3xl border outline-none font-bold ${isDarkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200'}`} value={newEvent.entryFee} onChange={e => setNewEvent({...newEvent, entryFee: e.target.value.replace(/[^0-9.]/g, '')})} /></div>}
-                                        </div>
-                                        <div className="space-y-3">
-                                            <label className={`text-[10px] font-black uppercase tracking-[0.2em] ml-2 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>Location</label>
-                                            <input required type="text" placeholder="e.g. Tenby Harbour" className={`w-full px-8 py-5 rounded-3xl border outline-none font-bold transition-all ${isDarkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-100'}`} value={newEvent.location} onChange={e => setNewEvent({...newEvent, location: e.target.value})} />
-                                        </div>
-                                        <div className="space-y-3">
-                                            <label className={`text-[10px] font-black uppercase tracking-[0.2em] ml-2 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>Tags</label>
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                                {AVAILABLE_TAGS.map(tag => (<label key={tag} className={`flex items-center gap-3 p-3 rounded-2xl border transition-all cursor-pointer ${newEvent.tags.includes(tag) ? (isDarkMode ? 'bg-sky-900/30 border-sky-600 text-sky-400' : 'bg-sky-50 border-sky-400 text-sky-700') : (isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-500' : 'bg-slate-50 border-slate-100 text-slate-500')}`}><input type="checkbox" className="hidden" checked={newEvent.tags.includes(tag)} onChange={() => toggleTag(tag)} /><Icon name={newEvent.tags.includes(tag) ? "check-circle" : "circle"} size={16} /><span className="text-xs font-bold">{tag}</span></label>))}
-                                                <label className={`flex items-center gap-3 p-3 rounded-2xl border transition-all cursor-pointer ${newEvent.isOtherTagSelected ? (isDarkMode ? 'bg-sky-900/30 border-sky-600 text-sky-400' : 'bg-sky-50 border-sky-400 text-sky-700') : (isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-500' : 'bg-slate-50 border-slate-100 text-slate-500')}`}><input type="checkbox" className="hidden" checked={newEvent.isOtherTagSelected} onChange={() => setNewEvent(p => ({...p, isOtherTagSelected: !p.isOtherTagSelected}))} /><Icon name={newEvent.isOtherTagSelected ? "check-circle" : "circle"} size={16} /><span className="text-xs font-bold">Other...</span></label>
-                                            </div>{newEvent.isOtherTagSelected && <div className="mt-2 animate-in slide-in-from-top-1 duration-200"><input type="text" placeholder="Custom tag..." className={`w-full px-6 py-4 rounded-2xl border outline-none font-bold text-sm ${isDarkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200'}`} value={newEvent.otherTag} onChange={e => setNewEvent(p => ({...p, otherTag: e.target.value}))} /></div>}
-                                        </div>
-                                        <div className="space-y-3">
-                                            <label className={`text-[10px] font-black uppercase tracking-[0.2em] ml-2 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>Contact</label>
-                                            <input type="text" placeholder="Email or Phone" className={`w-full px-8 py-5 rounded-3xl border outline-none font-bold transition-all ${isDarkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-100'}`} value={newEvent.contact} onChange={e => setNewEvent({...newEvent, contact: e.target.value})} />
-                                        </div>
-                                        <div className="space-y-3">
-                                            <label className={`text-[10px] font-black uppercase tracking-[0.2em] ml-2 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>Description</label>
-                                            <textarea rows="3" placeholder="..." className={`w-full px-8 py-5 rounded-3xl border outline-none font-medium ${isDarkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-100'}`} value={newEvent.description} onChange={e => setNewEvent({...newEvent, description: e.target.value})}></textarea>
-                                        </div>
+                                        <div className="space-y-2"><label className="text-[10px] font-black uppercase text-slate-400 ml-2">Entry</label><div className="flex gap-2"><button type="button" onClick={() => setNewEvent({...newEvent, entryType: 'Free'})} className={`flex-1 py-3 rounded-xl font-bold ${newEvent.entryType === 'Free' ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-500'}`}>Free</button><button type="button" onClick={() => setNewEvent({...newEvent, entryType: 'Paid'})} className={`flex-1 py-3 rounded-xl font-bold ${newEvent.entryType === 'Paid' ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-500'}`}>Paid</button></div>{newEvent.entryType === 'Paid' && <input type="text" placeholder="Price (£)" className="w-full mt-2 px-6 py-4 rounded-2xl border outline-none font-bold bg-slate-50 dark:bg-slate-800" value={newEvent.entryFee} onChange={e => setNewEvent({...newEvent, entryFee: e.target.value})} />}</div>
+                                        <div className="space-y-2"><label className="text-[10px] font-black uppercase text-slate-400 ml-2">Description</label><textarea rows="3" placeholder="..." className={`w-full px-6 py-4 rounded-2xl border outline-none font-medium ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'}`} value={newEvent.description} onChange={e => setNewEvent({...newEvent, description: e.target.value})}></textarea></div>
                                     </div>
-                                    <button type="submit" className="w-full py-6 rounded-3xl bg-indigo-600 text-white font-black text-xl hover:bg-indigo-700 shadow-2xl active:scale-95 transition-all">{isAdmin ? "Publish Event Now" : "Send for Hub Review"}</button>
+                                    <button type="submit" className="w-full py-6 rounded-3xl bg-indigo-600 text-white font-black text-xl active:scale-95 transition-all">Submit Now</button>
                                 </form>
                             </div>
                         </div>
